@@ -34,7 +34,7 @@ const categoryDetails = {
 export default function Categories() {
   const categories = CAKE_CATEGORIES.map((category) => ({
     ...category,
-    ...categoryDetails[category.label],
+    ...categoryDetails[category.label as keyof typeof categoryDetails],
   }));
 
   return (
