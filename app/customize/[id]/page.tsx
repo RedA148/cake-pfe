@@ -1,8 +1,11 @@
 "use client";
 
 import Image from "next/image";
-import { Circle, Heart, Ruler, Sparkles, Square, Upload } from "lucide-react";
-import { ChangeEvent, useMemo, useState } from "react";
+import { Circle, Heart, Ruler, Sparkles, Square, Upload, BadgeCheck } from "lucide-react";
+import { ChangeEvent, useEffect, useMemo, useState } from "react";
+import { useParams, useRouter } from "next/navigation";
+import { createClient } from "@/lib/client";
+import type { Product } from "@/lib/product";
 
 const shapeOptions = [
   { id: "round", label: "Rond", icon: Circle },
@@ -27,9 +30,26 @@ const colorOptions = [
   { name: "Red", value: "#C0392B" },
 ];
 
-const basePrice = 350;
+type CartItem = {
+  productId: number;
+  productName: string;
+  productImage: string;
+  category?: string;
+  shape: string;
+  size: string;
+  flavor: string;
+  color: string;
+  customText: string;
+  instructions: string;
+  uploadedImage: string | null;
+  quantity: number;
+  totalPrice: number;
+  unitPrice: number;
+};
 
 export default function CustomizePage() {
+  const params = useParams<{ id?: string | string[] }>();
+  const router = useRouter();
   const [shape, setShape] = useState("round");
   const [size, setSize] = useState("2");
   const [flavor, setFlavor] = useState("Vanille");
@@ -37,6 +57,88 @@ export default function CustomizePage() {
   const [text, setText] = useState("");
   const [instructions, setInstructions] = useState("");
   const [imagePreview, setImagePreview] = useState<string | null>(null);
+  const [showToast, setShowToast] = useState(false);
+  const [isAdding, setIsAdding] = useState(false);
+  const [product, setProduct] = useState<Product | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  const routeId = params?.id;
+  const productId = typeof routeId === "string" && routeId.trim() !== "" ? Number(routeId) : Number.NaN;
+  const hasValidProductId = Number.isInteger(productId) && productId > 0;
+
+  useEffect(() => {
+    let isCurrentRequest = true;
+
+    async function loadProduct() {
+      if (!hasValidProductId) {
+        setProduct(null);
+        setError("L’identifiant du produit est invalide.");
+        setLoading(false);
+        return;
+      }
+
+      setLoading(true);
+      setError(null);
+      setProduct(null);
+
+      const supabase = createClient();
+      const { data, error: supabaseError } = await supabase
+        .from("products")
+        .select(`
+          id,
+          category_id,
+          name,
+          description,
+          base_price,
+          image_url,
+          is_available,
+          created_at,
+          categories (
+            name
+          )
+        `)
+        .eq("id", productId)
+        .single();
+
+      if (!isCurrentRequest) return;
+
+      if (supabaseError) {
+        console.error(supabaseError);
+        setError(
+          supabaseError.code === "PGRST116"
+            ? "Le produit demandé n’existe pas."
+            : "Impossible de charger ce produit. Veuillez réessayer.",
+        );
+        setLoading(false);
+        return;
+      }
+
+      if (!data) {
+        setError("Le produit demandé n’existe pas.");
+        setLoading(false);
+        return;
+      }
+
+      const productData = data as Omit<Product, "categories"> & {
+        categories?: Product["categories"] | { name: string }[];
+      };
+      const category = Array.isArray(productData.categories)
+        ? productData.categories[0] ?? null
+        : productData.categories ?? null;
+
+      setProduct({ ...productData, categories: category });
+      setLoading(false);
+    }
+
+    void loadProduct();
+
+    return () => {
+      isCurrentRequest = false;
+    };
+  }, [hasValidProductId, productId]);
+
+  const basePrice = product ? Number(product.base_price) || 0 : 0;
 
   const selectedSize = sizeOptions.find((option) => option.id === size) ?? sizeOptions[0];
   const totalPrice = basePrice + selectedSize.price;
@@ -52,11 +154,120 @@ export default function CustomizePage() {
     reader.readAsDataURL(file);
   };
 
+  const handleAddToCart = () => {
+    console.log("[CustomizePage] Add to cart clicked");
+
+    if (!product || !product.is_available || isAdding) {
+      return;
+    }
+
+    if (typeof window === "undefined") {
+      console.error("[CustomizePage] localStorage is unavailable outside the browser");
+      return;
+    }
+
+    setIsAdding(true);
+    console.log("[CustomizePage] Preparing cart item");
+
+    try {
+      const cartItem: CartItem = {
+        productId: product.id,
+        productName: product.name,
+        productImage: product.image_url ?? "",
+        category: product.categories?.name ?? undefined,
+        shape: shapeOptions.find((option) => option.id === shape)?.label ?? shape,
+        size: selectedSize.label,
+        flavor,
+        color: colorOptions.find((option) => option.value === color)?.name ?? color,
+        customText: text,
+        instructions,
+        uploadedImage: imagePreview,
+        quantity: 1,
+        totalPrice,
+        unitPrice: totalPrice,
+      };
+
+      const storedCart = window.localStorage.getItem("cart");
+      let cart: CartItem[] = [];
+
+      if (storedCart) {
+        try {
+          const parsedCart: unknown = JSON.parse(storedCart);
+          if (Array.isArray(parsedCart)) {
+            cart = parsedCart as CartItem[];
+          } else {
+            console.warn("[CustomizePage] Stored cart is not an array; starting a new cart");
+          }
+        } catch (error) {
+          console.error("[CustomizePage] Unable to parse stored cart; starting a new cart", error);
+        }
+      }
+
+      const duplicateIndex = cart.findIndex(
+        (item) =>
+          item.productId === cartItem.productId &&
+          item.shape === cartItem.shape &&
+          item.size === cartItem.size &&
+          item.flavor === cartItem.flavor &&
+          item.color === cartItem.color &&
+          item.customText === cartItem.customText &&
+          item.instructions === cartItem.instructions &&
+          item.uploadedImage === cartItem.uploadedImage,
+      );
+
+      if (duplicateIndex > -1) {
+        const existingItem = cart[duplicateIndex];
+        existingItem.quantity += 1;
+        existingItem.totalPrice = existingItem.quantity * existingItem.unitPrice;
+      } else {
+        cart.push(cartItem);
+      }
+
+      window.localStorage.setItem("cart", JSON.stringify(cart));
+      console.log("[CustomizePage] Cart saved successfully", cart);
+
+      setShowToast(true);
+      window.setTimeout(() => {
+        console.log("[CustomizePage] Redirecting to /cart");
+        router.push("/cart");
+      }, 1000);
+    } catch (error) {
+      console.error("[CustomizePage] Failed to save cart or redirect", error);
+      setIsAdding(false);
+    }
+  };
+
   const previewShape = useMemo(() => {
     if (shape === "heart") return "rounded-[40px]";
     if (shape === "square") return "rounded-[24px]";
     return "rounded-full";
   }, [shape]);
+
+  if (loading) {
+    return (
+      <main className="min-h-screen bg-[#FAFAFA] pt-24 text-gray-900">
+        <section className="mx-auto max-w-7xl px-6 py-16 sm:px-8 lg:px-10">
+          <div className="rounded-[28px] border border-gray-200 bg-white p-6 text-center shadow-[0_20px_60px_-20px_rgba(0,0,0,0.18)] sm:p-8">
+            <p className="text-sm font-semibold uppercase tracking-[0.35em] text-[#D4AF37]">Chargement</p>
+            <p className="mt-3 text-lg text-gray-600">Chargement du produit...</p>
+          </div>
+        </section>
+      </main>
+    );
+  }
+
+  if (error || !product) {
+    return (
+      <main className="min-h-screen bg-[#FAFAFA] pt-24 text-gray-900">
+        <section className="mx-auto max-w-7xl px-6 py-16 sm:px-8 lg:px-10">
+          <div className="rounded-[28px] border border-gray-200 bg-white p-6 text-center shadow-[0_20px_60px_-20px_rgba(0,0,0,0.18)] sm:p-8" role="alert">
+            <p className="text-sm font-semibold uppercase tracking-[0.35em] text-[#D4AF37]">Erreur</p>
+            <p className="mt-3 text-lg text-gray-600">{error ?? "Le produit demandé n’existe pas."}</p>
+          </div>
+        </section>
+      </main>
+    );
+  }
 
   return (
     <main className="min-h-screen bg-[#FAFAFA] pt-24 text-gray-900">
@@ -139,7 +350,9 @@ export default function CustomizePage() {
                   return (
                     <button
                       key={option.id}
+                      type="button"
                       onClick={() => setShape(option.id)}
+                      aria-label={`Choisir la forme ${option.label}`}
                       className={`rounded-[20px] border p-4 text-center transition duration-300 ${
                         isActive
                           ? "border-[#D4AF37] bg-[#FFF8E8] text-[#D4AF37] shadow-sm"
@@ -165,7 +378,9 @@ export default function CustomizePage() {
                   return (
                     <button
                       key={option.id}
+                      type="button"
                       onClick={() => setSize(option.id)}
+                      aria-label={`Choisir la taille ${option.label}`}
                       className={`rounded-[20px] border p-4 text-left transition duration-300 ${
                         isActive
                           ? "border-[#D4AF37] bg-[#FFF8E8] text-[#D4AF37] shadow-sm"
@@ -196,7 +411,9 @@ export default function CustomizePage() {
                   return (
                     <button
                       key={option}
+                      type="button"
                       onClick={() => setFlavor(option)}
+                      aria-label={`Choisir la saveur ${option}`}
                       className={`rounded-[20px] border p-3 text-sm font-semibold transition duration-300 ${
                         isActive
                           ? "border-[#D4AF37] bg-[#FFF8E8] text-[#D4AF37]"
@@ -221,12 +438,14 @@ export default function CustomizePage() {
                   return (
                     <button
                       key={option.name}
+                      type="button"
                       onClick={() => setColor(option.value)}
                       className={`flex h-12 w-12 items-center justify-center rounded-full border-2 transition ${
                         isActive ? "border-[#D4AF37] scale-110" : "border-transparent"
                       }`}
                       style={{ backgroundColor: option.value }}
                       title={option.name}
+                      aria-label={`Choisir la couleur ${option.name}`}
                     />
                   );
                 })}
@@ -254,7 +473,7 @@ export default function CustomizePage() {
                 <Upload className="h-8 w-8 text-[#D4AF37]" />
                 <span className="mt-3 text-sm font-semibold text-[#D4AF37]">Cliquer pour télécharger</span>
                 <span className="mt-1 text-sm text-gray-600">PNG, JPG, WEBP</span>
-                <input type="file" accept="image/*" className="hidden" onChange={handleImageUpload} />
+                <input type="file" accept="image/*" className="hidden" onChange={handleImageUpload} aria-label="Télécharger une image pour le gâteau" />
               </label>
             </div>
 
@@ -287,7 +506,7 @@ export default function CustomizePage() {
               <div className="mt-6 space-y-3 text-sm text-gray-600">
                 <div className="flex justify-between">
                   <span>Prix de base</span>
-                  <span className="font-semibold text-gray-900">350 DH</span>
+                  <span className="font-semibold text-gray-900">{basePrice} DH</span>
                 </div>
                 <div className="flex justify-between">
                   <span>Options sélectionnées</span>
@@ -299,13 +518,33 @@ export default function CustomizePage() {
                 </div>
               </div>
 
-              <button className="mt-6 w-full rounded-full bg-[#D4AF37] px-4 py-3 text-sm font-semibold text-white transition duration-300 hover:bg-[#c79c1f]">
-                Ajouter au panier
+              <button
+                type="button"
+                onClick={handleAddToCart}
+                disabled={!product || !product.is_available || isAdding}
+                aria-label="Ajouter cette création au panier"
+                className="mt-6 w-full rounded-full bg-[#D4AF37] px-4 py-3 text-sm font-semibold text-white transition duration-300 hover:bg-[#c79c1f] disabled:opacity-55"
+              >
+                {isAdding ? "Ajout en cours..." : "Ajouter au panier"}
               </button>
+              {!product.is_available ? (
+                <p className="mt-3 text-center text-sm font-medium text-gray-600">
+                  Ce produit est actuellement indisponible.
+                </p>
+              ) : null}
             </div>
           </div>
         </div>
       </section>
+
+      {showToast && (
+        <div className="fixed bottom-5 right-5 z-50 flex items-center gap-3 rounded-2xl bg-gray-900 px-6 py-4 text-white shadow-[0_20px_50px_-10px_rgba(0,0,0,0.3)] transition-all duration-500 border border-white/10 animate-in fade-in slide-in-from-bottom-5">
+          <div className="flex h-8 w-8 items-center justify-center rounded-full bg-[#D4AF37]/20 text-[#D4AF37]">
+            <BadgeCheck className="h-5 w-5" />
+          </div>
+          <span className="text-sm font-semibold">Produit ajouté au panier</span>
+        </div>
+      )}
     </main>
   );
 }

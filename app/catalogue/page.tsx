@@ -1,6 +1,7 @@
 import { Suspense } from "react";
 import CatalogueContent from "@/components/CatalogueContent";
 import Navbar from "@/components/Navbar";
+import { getActiveProducts } from "@/lib/product-data";
 
 function CatalogueFallback() {
   return (
@@ -22,12 +23,14 @@ function CatalogueFallback() {
   );
 }
 
-export default function CataloguePage() {
+export default async function CataloguePage() {
+  const products = await getActiveProducts();
+
   return (
     <>
       <Navbar />
       <Suspense fallback={<CatalogueFallback />}>
-        <CatalogueContent />
+        <CatalogueContent products={products} />
       </Suspense>
     </>
   );

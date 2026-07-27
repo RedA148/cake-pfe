@@ -11,9 +11,13 @@ import {
   getCategoryLabelFromSlug,
   getCategorySlugFromLabel,
 } from "@/lib/categories";
-import { products } from "@/lib/products";
+import { formatProductPrice, getProductBadge, type Product } from "@/lib/product";
 
-export default function CatalogueContent() {
+type CatalogueContentProps = {
+  products: Product[];
+};
+
+export default function CatalogueContent({ products }: CatalogueContentProps) {
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
@@ -28,13 +32,13 @@ export default function CatalogueContent() {
     return products.filter((product) => {
       const matchesCategory =
         activeCategory === ALL_CATEGORIES_OPTION.label ||
-        product.category === activeCategory;
+        product.categories?.name === activeCategory;
       const matchesSearch = product.name
         .toLowerCase()
         .includes(search.toLowerCase());
       return matchesCategory && matchesSearch;
     });
-  }, [activeCategory, search]);
+  }, [activeCategory, products, search]);
 
   const handleCategoryChange = (nextCategory: string) => {
     const params = new URLSearchParams(searchParams.toString());
@@ -100,38 +104,46 @@ export default function CatalogueContent() {
         </div>
 
         <div className="mt-12 grid grid-cols-1 gap-8 sm:grid-cols-2 lg:grid-cols-4">
-          {filteredProducts.map((product) => (
-            <div
-              key={product.id}
-              className="group flex h-full flex-col overflow-hidden rounded-[24px] border border-gray-200 bg-white shadow-[0_10px_40px_-20px_rgba(0,0,0,0.25)] transition-all duration-300 hover:-translate-y-2 hover:shadow-[0_20px_60px_-20px_rgba(0,0,0,0.35)]"
-            >
-              <div className="relative aspect-square overflow-hidden">
-                <Image
-                  src={product.image}
-                  alt={product.name}
-                  fill
-                  sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 25vw"
-                  className="object-cover transition duration-300 group-hover:scale-105"
-                />
-                <span className="absolute left-4 top-4 rounded-full bg-[#D4AF37] px-3 py-1 text-xs font-semibold uppercase tracking-wide text-white">
-                  {product.badge}
-                </span>
-              </div>
+          {filteredProducts.map((product) => {
+            const badge = getProductBadge(product);
 
-              <div className="flex flex-1 flex-col p-6">
-                <Link href={`/product/${product.id}`} className="block">
-                  <h3 className="text-xl font-semibold text-gray-900">{product.name}</h3>
-                </Link>
-                <p className="mt-2 text-lg font-semibold text-[#D4AF37]">{product.price}</p>
-                <Link
-                  href={`/customize/${product.id}`}
-                  className="mt-6 w-full rounded-full bg-[#D4AF37] px-4 py-3 text-center text-sm font-semibold text-white transition duration-300 hover:bg-[#c79c1f]"
-                >
-                  Personnaliser
-                </Link>
+            return (
+              <div
+                key={product.id}
+                className="group flex h-full flex-col overflow-hidden rounded-[24px] border border-gray-200 bg-white shadow-[0_10px_40px_-20px_rgba(0,0,0,0.25)] transition-all duration-300 hover:-translate-y-2 hover:shadow-[0_20px_60px_-20px_rgba(0,0,0,0.35)]"
+              >
+                <div className="relative aspect-square overflow-hidden">
+                  <Image
+                    src={product.image_url ?? "/images/products/cake1.jpg"}
+                    alt={product.name}
+                    fill
+                    sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 25vw"
+                    className="object-cover transition duration-300 group-hover:scale-105"
+                  />
+                  {badge ? (
+                    <span className="absolute left-4 top-4 rounded-full bg-[#D4AF37] px-3 py-1 text-xs font-semibold uppercase tracking-wide text-white">
+                      {badge}
+                    </span>
+                  ) : null}
+                </div>
+
+                <div className="flex flex-1 flex-col p-6">
+                  <Link href={`/product/${product.id}`} className="block">
+                    <h3 className="text-xl font-semibold text-gray-900">{product.name}</h3>
+                  </Link>
+                  <p className="mt-2 text-lg font-semibold text-[#D4AF37]">
+                    {formatProductPrice(product.base_price)}
+                  </p>
+                  <Link
+                    href={`/customize/${product.id}`}
+                    className="mt-6 w-full rounded-full bg-[#D4AF37] px-4 py-3 text-center text-sm font-semibold text-white transition duration-300 hover:bg-[#c79c1f]"
+                  >
+                    Personnaliser
+                  </Link>
+                </div>
               </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
 
         <div className="mt-14 flex flex-wrap items-center justify-center gap-3">

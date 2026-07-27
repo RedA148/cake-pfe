@@ -3,7 +3,49 @@
 import Link from "next/link";
 import { FcGoogle } from "react-icons/fc";
 import { ArrowRight, Lock, Mail, Sparkles } from "lucide-react";
+import { FormEvent, useState } from "react";
+import { createClient } from "@/utils/supabase/client";
+
 export default function LoginPage() {
+  const [isGoogleLoading, setIsGoogleLoading] = useState(false);
+  const [authError, setAuthError] = useState<string | null>(null);
+
+  const handleGoogleLogin = async () => {
+    console.log("Google login clicked");
+    setAuthError(null);
+    setIsGoogleLoading(true);
+
+    try {
+      const supabase = createClient();
+      const { data, error } = await supabase.auth.signInWithOAuth({
+        provider: "google",
+        options: {
+          redirectTo: `${window.location.origin}/auth/callback`,
+        },
+      });
+
+      console.log("Google OAuth data", data);
+      console.log("Google OAuth error", error);
+
+      if (error) {
+        throw error;
+      }
+
+      if (!data.url) {
+        throw new Error("Supabase did not return a Google OAuth redirect URL.");
+      }
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Unable to start Google sign-in.";
+      console.error("Google OAuth failed", error);
+      setAuthError(message);
+      setIsGoogleLoading(false);
+    }
+  };
+
+  const handlePasswordSubmit = (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+  };
+
   return (
     <main className="min-h-screen bg-[#FAFAFA] pt-24 text-gray-900">
       <section className="mx-auto flex max-w-7xl items-center justify-center px-6 py-16 sm:px-8 lg:px-10 lg:py-20">
@@ -37,7 +79,7 @@ export default function LoginPage() {
                 <h2 className="text-2xl font-semibold text-gray-900">Connexion</h2>
                 <p className="mt-2 text-sm text-gray-600">Entrez vos informations pour accéder à votre compte.</p>
 
-                <form className="mt-8 space-y-4">
+                <form className="mt-8 space-y-4" onSubmit={handlePasswordSubmit}>
                   <label className="block text-sm font-medium text-gray-700">
                     <span className="mb-2 block">Email</span>
                     <div className="flex items-center rounded-full border border-gray-200 bg-[#FAFAFA] px-4 py-3 transition focus-within:border-[#D4AF37]">
@@ -69,18 +111,32 @@ export default function LoginPage() {
                     </label>
                   </div>
 
-                  <button className="flex w-full items-center justify-center gap-2 rounded-full bg-[#D4AF37] px-5 py-3.5 text-sm font-semibold text-white transition duration-300 hover:bg-[#c79c1f]">
+                  <button
+                    type="submit"
+                    className="flex w-full items-center justify-center gap-2 rounded-full bg-[#D4AF37] px-5 py-3.5 text-sm font-semibold text-white transition duration-300 hover:bg-[#c79c1f]"
+                  >
                     Se connecter
                     <ArrowRight className="h-4 w-4" />
                   </button>
                 </form>
 
                 <div className="mt-6">
-                  <button className="flex w-full items-center justify-center gap-3 rounded-full border border-gray-200 bg-white px-5 py-3.5 text-sm font-semibold text-gray-700 transition duration-300 hover:border-[#D4AF37] hover:text-[#D4AF37]">
+                  <button
+                    type="button"
+                    onClick={handleGoogleLogin}
+                    disabled={isGoogleLoading}
+                    className="flex w-full items-center justify-center gap-3 rounded-full border border-gray-200 bg-white px-5 py-3.5 text-sm font-semibold text-gray-700 transition duration-300 hover:border-[#D4AF37] hover:text-[#D4AF37] disabled:cursor-not-allowed disabled:opacity-60"
+                  >
                     <FcGoogle className="h-5 w-5" />
-                    Continuer avec Google
+                    {isGoogleLoading ? "Redirection vers Google..." : "Continuer avec Google"}
                   </button>
                 </div>
+
+                {authError ? (
+                  <p role="alert" className="mt-4 rounded-xl bg-red-50 px-4 py-3 text-sm text-red-700">
+                    {authError}
+                  </p>
+                ) : null}
 
                 <p className="mt-6 text-center text-sm text-gray-600">
                   Pas encore de compte ?{' '}

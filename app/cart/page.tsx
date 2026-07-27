@@ -3,21 +3,24 @@
 import Image from "next/image";
 import Link from "next/link";
 import { ArrowRight, BadgeCheck, Home, Minus, Plus, Sparkles, Trash2 } from "lucide-react";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 
-const cartItem = {
-  id: 1,
-  name: "Royal Velvet Dream",
-  category: "Mariage",
-  shape: "Ronde",
-  size: "6 étages",
-  flavor: "Vanille & pistache",
-  color: "Or champagne",
-  customText: "Lina & Sam",
-  uploadedImage: true,
-  image: "/images/products/cake1.jpg",
-  unitPrice: 620,
-};
+export interface CartItem {
+  productId: number;
+  productName: string;
+  productImage: string;
+  category?: string;
+  shape: string;
+  size: string;
+  flavor: string;
+  color: string;
+  customText: string;
+  instructions: string;
+  uploadedImage: string | null;
+  quantity: number;
+  totalPrice: number;
+  unitPrice: number;
+}
 
 const relatedProducts = [
   {
@@ -47,16 +50,53 @@ const relatedProducts = [
 ];
 
 export default function CartPage() {
-  const [quantity, setQuantity] = useState(1);
+  const [cart, setCart] = useState<CartItem[]>([]);
+  const [isMounted, setIsMounted] = useState(false);
   const [coupon, setCoupon] = useState("");
-  const isEmpty = false;
 
-  const subtotal = cartItem.unitPrice * quantity;
+  useEffect(() => {
+    setIsMounted(true);
+    const storedCart = localStorage.getItem("cart");
+    if (storedCart) {
+      try {
+        setCart(JSON.parse(storedCart));
+      } catch (e) {
+        console.error("Error loading cart:", e);
+      }
+    }
+  }, []);
+
+  const handleUpdateQuantity = (index: number, newQty: number) => {
+    const updatedCart = [...cart];
+    updatedCart[index].quantity = newQty;
+    updatedCart[index].totalPrice = newQty * updatedCart[index].unitPrice;
+    setCart(updatedCart);
+    localStorage.setItem("cart", JSON.stringify(updatedCart));
+  };
+
+  const handleRemoveItem = (index: number) => {
+    const updatedCart = cart.filter((_, i) => i !== index);
+    setCart(updatedCart);
+    localStorage.setItem("cart", JSON.stringify(updatedCart));
+  };
+
+  const subtotal = cart.reduce((sum, item) => sum + item.totalPrice, 0);
   const tax = Math.round(subtotal * 0.2);
   const shipping = 0;
   const total = subtotal + tax + shipping;
 
-  if (isEmpty) {
+  if (!isMounted) {
+    return (
+      <main className="min-h-screen bg-[#FAFAFA] pt-24 text-gray-900 flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-[#D4AF37] mx-auto"></div>
+          <p className="mt-4 text-gray-600 font-medium">Chargement du panier...</p>
+        </div>
+      </main>
+    );
+  }
+
+  if (cart.length === 0) {
     return (
       <main className="min-h-screen bg-[#FAFAFA] pt-24 text-gray-900">
         <section className="mx-auto flex max-w-7xl flex-col items-center px-6 py-24 text-center sm:px-8 lg:px-10">
@@ -109,92 +149,108 @@ export default function CartPage() {
 
         <div className="mt-12 grid gap-8 lg:grid-cols-[1.15fr_0.85fr]">
           <div className="space-y-6">
-            <div className="overflow-hidden rounded-[24px] border border-gray-200 bg-white p-5 shadow-[0_20px_60px_-25px_rgba(0,0,0,0.25)] transition duration-300 hover:-translate-y-1 hover:shadow-[0_25px_70px_-25px_rgba(0,0,0,0.35)] sm:p-7">
-              <div className="flex flex-col gap-6 lg:flex-row">
-                <div className="relative h-72 w-full overflow-hidden rounded-[24px] lg:w-72">
-                  <Image
-                    src={cartItem.image}
-                    alt={cartItem.name}
-                    fill
-                    sizes="(max-width: 1024px) 100vw, 288px"
-                    className="object-cover transition duration-500 hover:scale-105"
-                  />
-                </div>
+            {cart.map((item, index) => (
+              <div
+                key={index}
+                className="overflow-hidden rounded-[24px] border border-gray-200 bg-white p-5 shadow-[0_20px_60px_-25px_rgba(0,0,0,0.25)] transition duration-300 hover:-translate-y-1 hover:shadow-[0_25px_70px_-25px_rgba(0,0,0,0.35)] sm:p-7"
+              >
+                <div className="flex flex-col gap-6 lg:flex-row">
+                  <div className="relative h-72 w-full overflow-hidden rounded-[24px] lg:w-72">
+                    <Image
+                      src={item.productImage}
+                      alt={item.productName}
+                      fill
+                      sizes="(max-width: 1024px) 100vw, 288px"
+                      className="object-cover transition duration-500 hover:scale-105"
+                    />
+                  </div>
 
-                <div className="flex-1">
-                  <div className="flex flex-wrap items-start justify-between gap-4">
-                    <div>
-                      <div className="inline-flex items-center gap-2 rounded-full bg-[#FFF8E8] px-3 py-1 text-sm font-semibold text-[#D4AF37]">
-                        <Sparkles className="h-4 w-4" />
-                        {cartItem.category}
+                  <div className="flex-1">
+                    <div className="flex flex-wrap items-start justify-between gap-4">
+                      <div>
+                        <div className="inline-flex items-center gap-2 rounded-full bg-[#FFF8E8] px-3 py-1 text-sm font-semibold text-[#D4AF37]">
+                          <Sparkles className="h-4 w-4" />
+                          {item.category || "Personnalisé"}
+                        </div>
+                        <h2 className="mt-4 text-2xl font-semibold text-gray-900">
+                          {item.productName}
+                        </h2>
                       </div>
-                      <h2 className="mt-4 text-2xl font-semibold text-gray-900">
-                        {cartItem.name}
-                      </h2>
+                      <button
+                        onClick={() => handleRemoveItem(index)}
+                        className="rounded-full border border-gray-200 p-3 text-gray-500 transition hover:border-[#D4AF37] hover:bg-[#FFF8E8] hover:text-[#D4AF37]"
+                      >
+                        <Trash2 className="h-5 w-5" />
+                      </button>
                     </div>
-                    <button className="rounded-full border border-gray-200 p-3 text-gray-500 transition hover:border-[#D4AF37] hover:bg-[#FFF8E8] hover:text-[#D4AF37]">
-                      <Trash2 className="h-5 w-5" />
-                    </button>
-                  </div>
 
-                  <div className="mt-6 grid gap-3 text-sm text-gray-600 sm:grid-cols-2">
-                    <div className="rounded-[16px] border border-gray-200 bg-[#FAFAFA] p-3">
-                      <span className="block text-[11px] uppercase tracking-[0.25em] text-gray-400">Forme</span>
-                      <span className="mt-1 block font-semibold text-gray-900">{cartItem.shape}</span>
+                    <div className="mt-6 grid gap-3 text-sm text-gray-600 sm:grid-cols-2">
+                      <div className="rounded-[16px] border border-gray-200 bg-[#FAFAFA] p-3">
+                        <span className="block text-[11px] uppercase tracking-[0.25em] text-gray-400">Forme</span>
+                        <span className="mt-1 block font-semibold text-gray-900">{item.shape}</span>
+                      </div>
+                      <div className="rounded-[16px] border border-gray-200 bg-[#FAFAFA] p-3">
+                        <span className="block text-[11px] uppercase tracking-[0.25em] text-gray-400">Taille</span>
+                        <span className="mt-1 block font-semibold text-gray-900">{item.size}</span>
+                      </div>
+                      <div className="rounded-[16px] border border-gray-200 bg-[#FAFAFA] p-3">
+                        <span className="block text-[11px] uppercase tracking-[0.25em] text-gray-400">Saveur</span>
+                        <span className="mt-1 block font-semibold text-gray-900">{item.flavor}</span>
+                      </div>
+                      <div className="rounded-[16px] border border-gray-200 bg-[#FAFAFA] p-3">
+                        <span className="block text-[11px] uppercase tracking-[0.25em] text-gray-400">Couleur</span>
+                        <span className="mt-1 block font-semibold text-gray-900">{item.color}</span>
+                      </div>
                     </div>
-                    <div className="rounded-[16px] border border-gray-200 bg-[#FAFAFA] p-3">
-                      <span className="block text-[11px] uppercase tracking-[0.25em] text-gray-400">Taille</span>
-                      <span className="mt-1 block font-semibold text-gray-900">{cartItem.size}</span>
-                    </div>
-                    <div className="rounded-[16px] border border-gray-200 bg-[#FAFAFA] p-3">
-                      <span className="block text-[11px] uppercase tracking-[0.25em] text-gray-400">Saveur</span>
-                      <span className="mt-1 block font-semibold text-gray-900">{cartItem.flavor}</span>
-                    </div>
-                    <div className="rounded-[16px] border border-gray-200 bg-[#FAFAFA] p-3">
-                      <span className="block text-[11px] uppercase tracking-[0.25em] text-gray-400">Couleur</span>
-                      <span className="mt-1 block font-semibold text-gray-900">{cartItem.color}</span>
-                    </div>
-                  </div>
 
-                  <div className="mt-5 flex flex-wrap items-center gap-3">
-                    <div className="rounded-[16px] border border-gray-200 bg-[#FFF8E8] px-4 py-3 text-sm text-gray-700">
-                      <span className="font-semibold text-gray-900">Texte personnalisé :</span> {cartItem.customText}
+                    <div className="mt-5 flex flex-wrap items-center gap-3">
+                      {item.customText && (
+                        <div className="rounded-[16px] border border-gray-200 bg-[#FFF8E8] px-4 py-3 text-sm text-gray-700">
+                          <span className="font-semibold text-gray-900">Texte personnalisé :</span> {item.customText}
+                        </div>
+                      )}
+                      {item.uploadedImage && (
+                        <div className="inline-flex items-center gap-2 rounded-full border border-[#D4AF37]/30 bg-white px-3 py-2 text-sm font-medium text-[#D4AF37]">
+                          <BadgeCheck className="h-4 w-4" />
+                          Image uploadée
+                        </div>
+                      )}
                     </div>
-                    {cartItem.uploadedImage && (
-                      <div className="inline-flex items-center gap-2 rounded-full border border-[#D4AF37]/30 bg-white px-3 py-2 text-sm font-medium text-[#D4AF37]">
-                        <BadgeCheck className="h-4 w-4" />
-                        Image uploadée
+
+                    {item.instructions && (
+                      <div className="mt-3 rounded-[16px] border border-gray-200 bg-[#FAFAFA] p-3 text-sm text-gray-600">
+                        <span className="font-semibold text-gray-900">Instructions spéciales :</span> {item.instructions}
                       </div>
                     )}
-                  </div>
 
-                  <div className="mt-6 flex flex-wrap items-center justify-between gap-4 border-t border-gray-100 pt-6">
-                    <div className="flex items-center rounded-full border border-gray-200 bg-white px-3 py-2 shadow-sm">
-                      <button
-                        onClick={() => setQuantity((q) => Math.max(1, q - 1))}
-                        className="rounded-full p-2 text-[#D4AF37] transition hover:bg-[#FFF8E8]"
-                      >
-                        <Minus className="h-4 w-4" />
-                      </button>
-                      <span className="min-w-10 text-center text-base font-semibold text-gray-900">
-                        {quantity}
-                      </span>
-                      <button
-                        onClick={() => setQuantity((q) => q + 1)}
-                        className="rounded-full p-2 text-[#D4AF37] transition hover:bg-[#FFF8E8]"
-                      >
-                        <Plus className="h-4 w-4" />
-                      </button>
-                    </div>
+                    <div className="mt-6 flex flex-wrap items-center justify-between gap-4 border-t border-gray-100 pt-6">
+                      <div className="flex items-center rounded-full border border-gray-200 bg-white px-3 py-2 shadow-sm">
+                        <button
+                          onClick={() => handleUpdateQuantity(index, Math.max(1, item.quantity - 1))}
+                          className="rounded-full p-2 text-[#D4AF37] transition hover:bg-[#FFF8E8]"
+                        >
+                          <Minus className="h-4 w-4" />
+                        </button>
+                        <span className="min-w-10 text-center text-base font-semibold text-gray-900">
+                          {item.quantity}
+                        </span>
+                        <button
+                          onClick={() => handleUpdateQuantity(index, item.quantity + 1)}
+                          className="rounded-full p-2 text-[#D4AF37] transition hover:bg-[#FFF8E8]"
+                        >
+                          <Plus className="h-4 w-4" />
+                        </button>
+                      </div>
 
-                    <div className="text-right">
-                      <p className="text-sm text-gray-500">Prix unitaire</p>
-                      <p className="text-lg font-semibold text-gray-900">{cartItem.unitPrice} DH</p>
+                      <div className="text-right">
+                        <p className="text-sm text-gray-500">Prix unitaire</p>
+                        <p className="text-lg font-semibold text-gray-900">{item.unitPrice} DH</p>
+                      </div>
                     </div>
                   </div>
                 </div>
               </div>
-            </div>
+            ))}
           </div>
 
           <div className="lg:sticky lg:top-28 lg:self-start">
@@ -288,9 +344,12 @@ export default function CartPage() {
                 <div className="p-5">
                   <h4 className="text-lg font-semibold text-gray-900">{product.name}</h4>
                   <p className="mt-2 text-sm font-semibold text-[#D4AF37]">À partir de {product.price}</p>
-                  <button className="mt-5 w-full rounded-full border border-[#D4AF37] px-4 py-2.5 text-sm font-semibold text-[#D4AF37] transition duration-300 hover:bg-[#FFF8E8]">
+                  <Link
+                    href={`/customize/${product.id}`}
+                    className="mt-5 block w-full text-center rounded-full border border-[#D4AF37] px-4 py-2.5 text-sm font-semibold text-[#D4AF37] transition duration-300 hover:bg-[#FFF8E8]"
+                  >
                     Ajouter au panier
-                  </button>
+                  </Link>
                 </div>
               </div>
             ))}
