@@ -6,11 +6,18 @@ export type CategorySlug =
   | "saint-valentin";
 
 export type Category = {
+  id: number;
+  name: string;
+  slug?: string | null;
+  created_at?: string;
+};
+
+type MarketingCategory = {
   label: string;
   slug: CategorySlug;
 };
 
-export const CAKE_CATEGORIES: Category[] = [
+export const CAKE_CATEGORIES: MarketingCategory[] = [
   { label: "Anniversaire", slug: "anniversaire" },
   { label: "Mariage", slug: "mariage" },
   { label: "Baby Shower", slug: "baby-shower" },
@@ -21,6 +28,16 @@ export const CAKE_CATEGORIES: Category[] = [
 export const ALL_CATEGORIES_OPTION = { label: "Tous", slug: "" as const };
 
 export const CATALOGUE_CATEGORIES = [ALL_CATEGORIES_OPTION, ...CAKE_CATEGORIES];
+
+export function slugifyCategoryName(name: string): string {
+  return name
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .trim()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-|-$/g, "");
+}
 
 export function getCategoryLabelFromSlug(slug: string | null): string {
   if (!slug) {

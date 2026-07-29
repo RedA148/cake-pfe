@@ -83,7 +83,7 @@ export default function Hero() {
                       </p>
                       <div className="swiper-no-swiping relative z-10 mt-8 flex flex-wrap gap-4">
                         <Link
-                          href="/customize/1"
+                          href="/catalogue"
                           className="rounded-full bg-[#D4AF37] px-7 py-3.5 text-sm font-semibold text-white shadow-lg transition duration-300 hover:-translate-y-0.5 hover:bg-[#c79c1f]"
                         >
                           Personnaliser maintenant

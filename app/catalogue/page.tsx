@@ -2,6 +2,7 @@ import { Suspense } from "react";
 import CatalogueContent from "@/components/CatalogueContent";
 import Navbar from "@/components/Navbar";
 import { getActiveProducts } from "@/lib/product-data";
+import { getPublicCategories } from "@/lib/category-data";
 
 function CatalogueFallback() {
   return (
@@ -23,14 +24,21 @@ function CatalogueFallback() {
   );
 }
 
-export default async function CataloguePage() {
-  const products = await getActiveProducts();
+async function CatalogueProducts() {
+  const [products, categories] = await Promise.all([
+    getActiveProducts(),
+    getPublicCategories(),
+  ]);
 
+  return <CatalogueContent products={products} categories={categories} />;
+}
+
+export default function CataloguePage() {
   return (
     <>
       <Navbar />
       <Suspense fallback={<CatalogueFallback />}>
-        <CatalogueContent products={products} />
+        <CatalogueProducts />
       </Suspense>
     </>
   );

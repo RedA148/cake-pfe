@@ -1,5 +1,5 @@
-import Image from "next/image";
 import Link from "next/link";
+import ProductImage from "@/components/ProductImage";
 import { formatProductPrice, getProductBadge } from "@/lib/product";
 import { getFeaturedProducts } from "@/lib/product-data";
 
@@ -21,6 +21,11 @@ export default async function FeaturedProducts() {
         </div>
 
         <div className="grid grid-cols-1 gap-8 sm:grid-cols-2 lg:grid-cols-4">
+          {products.length === 0 ? (
+            <p className="col-span-full text-center text-lg text-gray-600">
+              Aucun produit disponible pour le moment.
+            </p>
+          ) : null}
           {products.map((product) => {
             const badge = getProductBadge(product);
 
@@ -30,8 +35,8 @@ export default async function FeaturedProducts() {
                 className="group flex h-full flex-col overflow-hidden rounded-[24px] border border-gray-200 bg-white shadow-[0_10px_40px_-20px_rgba(0,0,0,0.25)] transition-all duration-300 hover:-translate-y-2 hover:shadow-[0_20px_60px_-20px_rgba(0,0,0,0.35)]"
               >
               <div className="relative aspect-square overflow-hidden">
-                <Image
-                  src={product.image_url ?? "/images/products/cake1.jpg"}
+                <ProductImage
+                  src={product.image_url}
                   alt={product.name}
                   fill
                   sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 25vw"

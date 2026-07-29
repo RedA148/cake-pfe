@@ -1,64 +1,169 @@
 "use client";
 
-import Image from "next/image";
 import Link from "next/link";
 import { Minus, Plus, Star } from "lucide-react";
 import { useParams } from "next/navigation";
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { createClient } from "@/lib/client";
+import { formatProductPrice, type Product } from "@/lib/product";
+import ProductImage from "@/components/ProductImage";
 
-const product = {
-  id: 1,
-  name: "Royal Wedding Cake",
-  category: "Mariage",
-  price: "À partir de 350 DH",
-  description:
-    "Un gâteau de mariage raffiné, conçu avec des finitions élégantes et des saveurs délicates pour une célébration inoubliable.",
-  features: [
-    "Handmade",
-    "Premium ingredients",
-    "Fully customizable",
-    "Fast delivery",
-  ],
-  images: [
-    "/images/products/cake1.jpg",
-    "/images/products/cake2.jpg",
-    "/images/products/cake3.jpg",
-    "/images/products/cake4.jpg",
-  ],
+type ProductQueryRow = Omit<Product, "categories"> & {
+  categories?: Product["categories"] | NonNullable<Product["categories"]>[];
 };
 
-const relatedProducts = [
-  {
-    id: 2,
-    name: "Luxury Birthday Cake",
-    price: "À partir de 320 DH",
-    image: "/images/products/cake2.jpg",
-  },
-  {
-    id: 3,
-    name: "Baby Shower Cake",
-    price: "À partir de 280 DH",
-    image: "/images/products/cake3.jpg",
-  },
-  {
-    id: 4,
-    name: "Graduation Celebration",
-    price: "À partir de 300 DH",
-    image: "/images/products/cake4.jpg",
-  },
-  {
-    id: 5,
-    name: "Valentine Dream Cake",
-    price: "À partir de 260 DH",
-    image: "/images/products/cake5.jpg",
-  },
-];
+const productColumns = `
+  id,
+  category_id,
+  name,
+  description,
+  base_price,
+  image_url,
+  is_available,
+  created_at,
+  categories (
+    name
+  )
+`;
+
+function normalizeProduct(row: ProductQueryRow): Product {
+  return {
+    ...row,
+    categories: Array.isArray(row.categories)
+      ? row.categories[0] ?? null
+      : row.categories ?? null,
+  };
+}
 
 export default function ProductPage() {
-  const params = useParams<{ id?: string }>();
-  const [selectedImage, setSelectedImage] = useState(product.images[0]);
+  const params = useParams<{ id?: string | string[] }>();
+  const [product, setProduct] = useState<Product | null>(null);
+  const [relatedProducts, setRelatedProducts] = useState<Product[]>([]);
+  const [selectedImage, setSelectedImage] = useState("");
   const [quantity, setQuantity] = useState(1);
-  const customizeHref = params?.id ? `/customize/${params.id}` : "/customize";
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [notFound, setNotFound] = useState(false);
+  const routeId = params?.id;
+  const productId = typeof routeId === "string" ? Number(routeId) : Number.NaN;
+  const hasValidProductId = Number.isInteger(productId) && productId > 0;
+
+  useEffect(() => {
+    let isCurrentRequest = true;
+
+    async function loadProduct() {
+      if (!hasValidProductId) {
+        setNotFound(true);
+        setLoading(false);
+        return;
+      }
+
+      setLoading(true);
+      setError(null);
+      setNotFound(false);
+
+      const supabase = createClient();
+      const { data, error: productError } = await supabase
+        .from("products")
+        .select(productColumns)
+        .eq("id", productId)
+        .maybeSingle();
+
+      if (!isCurrentRequest) return;
+
+      if (productError) {
+        console.error("Unable to load product details", {
+          productId,
+          message: productError.message,
+          code: productError.code,
+          details: productError.details,
+          hint: productError.hint,
+        });
+        setError("Impossible de charger ce produit. Veuillez réessayer.");
+        setLoading(false);
+        return;
+      }
+
+      if (!data) {
+        setNotFound(true);
+        setLoading(false);
+        return;
+      }
+
+      const nextProduct = normalizeProduct(data as ProductQueryRow);
+      setProduct(nextProduct);
+      setSelectedImage(nextProduct.image_url ?? "/images/products/cake1.jpg");
+
+      const { data: relatedData, error: relatedError } = await supabase
+        .from("products")
+        .select(productColumns)
+        .eq("is_available", true)
+        .neq("id", productId)
+        .order("created_at", { ascending: false })
+        .limit(4);
+
+      if (!isCurrentRequest) return;
+
+      if (relatedError) {
+        console.error("Unable to load related products", {
+          productId,
+          message: relatedError.message,
+          code: relatedError.code,
+          details: relatedError.details,
+          hint: relatedError.hint,
+        });
+        setRelatedProducts([]);
+      } else {
+        setRelatedProducts(
+          (relatedData as ProductQueryRow[]).map(normalizeProduct),
+        );
+      }
+
+      setLoading(false);
+    }
+
+    void loadProduct();
+
+    return () => {
+      isCurrentRequest = false;
+    };
+  }, [hasValidProductId, productId]);
+
+  if (loading) {
+    return (
+      <main className="min-h-screen bg-[#FAFAFA] pt-24 text-gray-900">
+        <section className="mx-auto max-w-7xl px-6 py-16 text-center sm:px-8 lg:px-10">
+          <p className="text-sm font-semibold uppercase tracking-[0.35em] text-[#D4AF37]">Chargement</p>
+          <p className="mt-3 text-lg text-gray-600">Chargement du produit...</p>
+        </section>
+      </main>
+    );
+  }
+
+  if (notFound) {
+    return (
+      <main className="min-h-screen bg-[#FAFAFA] pt-24 text-gray-900">
+        <section className="mx-auto max-w-7xl px-6 py-16 text-center sm:px-8 lg:px-10">
+          <p className="text-sm font-semibold uppercase tracking-[0.35em] text-[#D4AF37]">Produit introuvable</p>
+          <p className="mt-3 text-lg text-gray-600">Le produit demandé n’existe pas.</p>
+        </section>
+      </main>
+    );
+  }
+
+  if (error || !product) {
+    return (
+      <main className="min-h-screen bg-[#FAFAFA] pt-24 text-gray-900">
+        <section className="mx-auto max-w-7xl px-6 py-16 text-center sm:px-8 lg:px-10" role="alert">
+          <p className="text-sm font-semibold uppercase tracking-[0.35em] text-[#D4AF37]">Erreur</p>
+          <p className="mt-3 text-lg text-gray-600">{error ?? "Impossible de charger ce produit."}</p>
+        </section>
+      </main>
+    );
+  }
+
+  const productImages = [selectedImage];
+  const customizeHref = `/customize/${product.id}`;
 
   return (
     <main className="min-h-screen bg-[#FAFAFA] pt-24 text-gray-900">
@@ -68,7 +173,7 @@ export default function ProductPage() {
           <div>
             <div className="overflow-hidden rounded-[28px] border border-gray-200 bg-white shadow-[0_20px_60px_-25px_rgba(0,0,0,0.25)]">
               <div className="relative aspect-square overflow-hidden">
-                <Image
+                <ProductImage
                   src={selectedImage}
                   alt={product.name}
                   fill
@@ -79,7 +184,7 @@ export default function ProductPage() {
             </div>
 
             <div className="mt-4 grid grid-cols-4 gap-3">
-              {product.images.map((image) => {
+              {productImages.map((image) => {
                 const isActive = image === selectedImage;
                 return (
                   <button
@@ -90,7 +195,7 @@ export default function ProductPage() {
                     }`}
                   >
                     <div className="relative aspect-square overflow-hidden">
-                      <Image
+                      <ProductImage
                         src={image}
                         alt="Thumbnail"
                         fill
@@ -106,7 +211,7 @@ export default function ProductPage() {
 
           <div className="flex flex-col justify-center">
             <div className="inline-flex w-fit rounded-full bg-[#D4AF37] px-3 py-1 text-sm font-semibold uppercase tracking-wide text-white">
-              {product.category}
+              {product.categories?.name ?? `Catégorie ${product.category_id ?? "—"}`}
             </div>
             <h1 className="mt-5 text-4xl font-bold text-gray-900 sm:text-5xl">
               {product.name}
@@ -126,14 +231,14 @@ export default function ProductPage() {
                 Prix de départ
               </p>
               <p className="mt-2 text-3xl font-semibold text-gray-900">
-                {product.price}
+                {formatProductPrice(product.base_price)}
               </p>
             </div>
 
             <div className="mt-6">
               <h2 className="text-lg font-semibold text-gray-900">Caractéristiques</h2>
               <ul className="mt-3 space-y-2 text-gray-700">
-                {product.features.map((feature) => (
+                {["Handmade", "Premium ingredients", "Fully customizable", "Fast delivery"].map((feature) => (
                   <li key={feature} className="flex items-center gap-2">
                     <span className="text-[#D4AF37]">✓</span>
                     <span>{feature}</span>
@@ -219,8 +324,8 @@ export default function ProductPage() {
                 className="group overflow-hidden rounded-[24px] border border-gray-200 bg-white shadow-[0_10px_35px_-20px_rgba(0,0,0,0.25)] transition duration-300 hover:-translate-y-2 hover:shadow-[0_20px_50px_-20px_rgba(0,0,0,0.35)]"
               >
                 <div className="relative aspect-square overflow-hidden">
-                  <Image
-                    src={item.image}
+                  <ProductImage
+                    src={item.image_url}
                     alt={item.name}
                     fill
                     sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 25vw"
@@ -229,7 +334,15 @@ export default function ProductPage() {
                 </div>
                 <div className="p-5">
                   <h3 className="text-lg font-semibold text-gray-900">{item.name}</h3>
-                  <p className="mt-2 text-sm font-semibold text-[#D4AF37]">{item.price}</p>
+                  <p className="mt-2 text-sm font-semibold text-[#D4AF37]">
+                    {formatProductPrice(item.base_price)}
+                  </p>
+                  <Link
+                    href={`/product/${item.id}`}
+                    className="mt-4 inline-block text-sm font-semibold text-[#D4AF37] hover:underline"
+                  >
+                    Voir le produit
+                  </Link>
                 </div>
               </div>
             ))}

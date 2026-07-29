@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { cookies } from "next/headers";
 import { createClient } from "@/utils/supabase/server";
+import { ensureCurrentUserProfile } from "@/lib/user-auth";
 
 export async function GET(request: Request) {
   const { searchParams, origin } = new URL(request.url);
@@ -23,30 +24,21 @@ export async function GET(request: Request) {
     return NextResponse.redirect(new URL("/login?error=oauth_callback_failed", origin));
   }
 
-  const user = data.user;
-  const metadata = user.user_metadata as {
-    avatar_url?: string;
-    full_name?: string;
-    name?: string;
-    picture?: string;
-  };
-
-  const { error: profileError } = await supabase.from("profiles").upsert(
-    {
-      id: user.id,
-      email: user.email ?? null,
-      full_name: metadata.full_name ?? metadata.name ?? null,
-      avatar_url: metadata.avatar_url ?? metadata.picture ?? null,
-      updated_at: new Date().toISOString(),
-    },
-    { onConflict: "id" },
-  );
-
-  if (profileError) {
-    console.error("[Supabase OAuth callback] profile sync failed", profileError);
+  try {
+    await ensureCurrentUserProfile(supabase);
+  } catch (profileError) {
+    const errorDetails = profileError && typeof profileError === "object"
+      ? profileError as { message?: string; code?: string; details?: string; hint?: string }
+      : {};
+    console.error("[Supabase OAuth callback] profile sync failed", {
+      message: errorDetails.message ?? "Unknown profile synchronization error",
+      code: errorDetails.code,
+      details: errorDetails.details,
+      hint: errorDetails.hint,
+    });
     return NextResponse.redirect(new URL("/login?error=profile_sync_failed", origin));
   }
 
-  console.log("[Supabase OAuth callback] session and profile created", { userId: user.id });
+  console.log("[Supabase OAuth callback] session and profile synchronized", { userId: data.user.id });
   return NextResponse.redirect(new URL(redirectPath, origin));
 }

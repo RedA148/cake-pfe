@@ -1,51 +1,83 @@
 "use client";
 
-import Image from "next/image";
 import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { ChevronLeft, ChevronRight, Search } from "lucide-react";
-import { useMemo, useState } from "react";
-import {
-  ALL_CATEGORIES_OPTION,
-  CATALOGUE_CATEGORIES,
-  getCategoryLabelFromSlug,
-  getCategorySlugFromLabel,
-} from "@/lib/categories";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { slugifyCategoryName, type Category } from "@/lib/categories";
 import { formatProductPrice, getProductBadge, type Product } from "@/lib/product";
+import ProductImage from "@/components/ProductImage";
 
 type CatalogueContentProps = {
   products: Product[];
+  categories: Category[];
 };
 
-export default function CatalogueContent({ products }: CatalogueContentProps) {
+export default function CatalogueContent({ products, categories }: CatalogueContentProps) {
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const [search, setSearch] = useState("");
+  const categoryScrollRef = useRef<HTMLDivElement>(null);
+  const [canScrollCategoriesLeft, setCanScrollCategoriesLeft] = useState(false);
+  const [canScrollCategoriesRight, setCanScrollCategoriesRight] = useState(false);
 
-  const activeCategory = useMemo(
-    () => getCategoryLabelFromSlug(searchParams.get("category")),
-    [searchParams],
-  );
+  const updateCategoryScrollControls = useCallback(() => {
+    const container = categoryScrollRef.current;
+    if (!container) return;
+    const maxScrollLeft = container.scrollWidth - container.clientWidth;
+    setCanScrollCategoriesLeft(container.scrollLeft > 1);
+    setCanScrollCategoriesRight(container.scrollLeft < maxScrollLeft - 1);
+  }, []);
+
+  useEffect(() => {
+    const container = categoryScrollRef.current;
+    if (!container) return;
+
+    const frame = window.requestAnimationFrame(updateCategoryScrollControls);
+    const resizeObserver = new ResizeObserver(updateCategoryScrollControls);
+    resizeObserver.observe(container);
+    if (container.firstElementChild) resizeObserver.observe(container.firstElementChild);
+    container.addEventListener("scroll", updateCategoryScrollControls, { passive: true });
+    window.addEventListener("resize", updateCategoryScrollControls);
+
+    return () => {
+      window.cancelAnimationFrame(frame);
+      resizeObserver.disconnect();
+      container.removeEventListener("scroll", updateCategoryScrollControls);
+      window.removeEventListener("resize", updateCategoryScrollControls);
+    };
+  }, [categories, updateCategoryScrollControls]);
+
+  function scrollCategories(direction: -1 | 1) {
+    categoryScrollRef.current?.scrollBy({ left: direction * 250, behavior: "smooth" });
+  }
+
+  const activeCategoryId = useMemo(() => {
+    const categoryParam = searchParams.get("category");
+    const value = Number(categoryParam);
+    if (Number.isInteger(value) && value > 0) return value;
+    return categories.find(
+      (category) => slugifyCategoryName(category.name) === categoryParam,
+    )?.id ?? null;
+  }, [categories, searchParams]);
 
   const filteredProducts = useMemo(() => {
     return products.filter((product) => {
       const matchesCategory =
-        activeCategory === ALL_CATEGORIES_OPTION.label ||
-        product.categories?.name === activeCategory;
+        activeCategoryId === null || product.category_id === activeCategoryId;
       const matchesSearch = product.name
         .toLowerCase()
         .includes(search.toLowerCase());
       return matchesCategory && matchesSearch;
     });
-  }, [activeCategory, products, search]);
+  }, [activeCategoryId, products, search]);
 
-  const handleCategoryChange = (nextCategory: string) => {
+  const handleCategoryChange = (nextCategoryId: number | null) => {
     const params = new URLSearchParams(searchParams.toString());
-    const nextSlug = getCategorySlugFromLabel(nextCategory);
 
-    if (nextSlug) {
-      params.set("category", nextSlug);
+    if (nextCategoryId) {
+      params.set("category", String(nextCategoryId));
     } else {
       params.delete("category");
     }
@@ -70,8 +102,8 @@ export default function CatalogueContent({ products }: CatalogueContentProps) {
         </div>
 
         <div className="mt-12 rounded-[28px] border border-gray-200 bg-white p-4 shadow-[0_15px_50px_-20px_rgba(0,0,0,0.25)] sm:p-6">
-          <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-            <label className="flex flex-1 items-center gap-3 rounded-full border border-gray-200 bg-[#FAFAFA] px-4 py-3 shadow-sm">
+          <div className="flex flex-col gap-4">
+            <label className="flex w-full items-center gap-3 rounded-full border border-gray-200 bg-[#FAFAFA] px-4 py-3 shadow-sm">
               <Search className="h-5 w-5 text-[#D4AF37]" />
               <input
                 type="text"
@@ -82,28 +114,70 @@ export default function CatalogueContent({ products }: CatalogueContentProps) {
               />
             </label>
 
-            <div className="flex flex-wrap gap-3">
-              {CATALOGUE_CATEGORIES.map((category) => {
-                const isActive = category.label === activeCategory;
-                return (
+            <div className="relative w-full max-w-full overflow-hidden">
+              <div
+                ref={categoryScrollRef}
+                className="no-scrollbar w-full max-w-full touch-pan-x overflow-x-auto overscroll-x-contain scroll-smooth"
+                tabIndex={0}
+                aria-label="Catégories du catalogue"
+              >
+                <div className="flex w-max min-w-full flex-nowrap gap-3">
+                  {[{ id: null, name: "Tous" }, ...categories].map((category) => {
+                    const isActive = category.id === activeCategoryId;
+                    return (
+                      <button
+                        key={category.id ?? "all"}
+                        onClick={() => handleCategoryChange(category.id)}
+                        className={`shrink-0 whitespace-nowrap rounded-full border px-4 py-2 text-sm font-semibold transition duration-300 ${
+                          isActive
+                            ? "border-[#D4AF37] bg-[#D4AF37] text-white"
+                            : "border-gray-200 bg-white text-gray-700 hover:border-[#D4AF37] hover:text-[#D4AF37]"
+                        }`}
+                      >
+                        {category.name}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {canScrollCategoriesLeft ? (
+                <>
+                  <div className="pointer-events-none absolute inset-y-0 left-0 z-10 w-16 bg-gradient-to-r from-white via-white/80 to-transparent" />
                   <button
-                    key={category.label}
-                    onClick={() => handleCategoryChange(category.label)}
-                    className={`rounded-full border px-4 py-2 text-sm font-semibold transition duration-300 ${
-                      isActive
-                        ? "border-[#D4AF37] bg-[#D4AF37] text-white"
-                        : "border-gray-200 bg-white text-gray-700 hover:border-[#D4AF37] hover:text-[#D4AF37]"
-                    }`}
+                    type="button"
+                    onClick={() => scrollCategories(-1)}
+                    aria-label="Voir les catégories précédentes"
+                    className="absolute left-1 top-1/2 z-20 flex h-9 w-9 -translate-y-1/2 items-center justify-center rounded-full border border-gray-200 bg-white text-[#D4AF37] shadow-sm transition hover:border-[#D4AF37] hover:shadow-md"
                   >
-                    {category.label}
+                    <ChevronLeft className="h-5 w-5" />
                   </button>
-                );
-              })}
+                </>
+              ) : null}
+
+              {canScrollCategoriesRight ? (
+                <>
+                  <div className="pointer-events-none absolute inset-y-0 right-0 z-10 w-16 bg-gradient-to-l from-white via-white/80 to-transparent" />
+                  <button
+                    type="button"
+                    onClick={() => scrollCategories(1)}
+                    aria-label="Voir les catégories suivantes"
+                    className="absolute right-1 top-1/2 z-20 flex h-9 w-9 -translate-y-1/2 items-center justify-center rounded-full border border-gray-200 bg-white text-[#D4AF37] shadow-sm transition hover:border-[#D4AF37] hover:shadow-md"
+                  >
+                    <ChevronRight className="h-5 w-5" />
+                  </button>
+                </>
+              ) : null}
             </div>
           </div>
         </div>
 
         <div className="mt-12 grid grid-cols-1 gap-8 sm:grid-cols-2 lg:grid-cols-4">
+          {filteredProducts.length === 0 ? (
+            <p className="col-span-full text-center text-lg text-gray-600">
+              Aucun produit ne correspond à votre recherche.
+            </p>
+          ) : null}
           {filteredProducts.map((product) => {
             const badge = getProductBadge(product);
 
@@ -113,8 +187,8 @@ export default function CatalogueContent({ products }: CatalogueContentProps) {
                 className="group flex h-full flex-col overflow-hidden rounded-[24px] border border-gray-200 bg-white shadow-[0_10px_40px_-20px_rgba(0,0,0,0.25)] transition-all duration-300 hover:-translate-y-2 hover:shadow-[0_20px_60px_-20px_rgba(0,0,0,0.35)]"
               >
                 <div className="relative aspect-square overflow-hidden">
-                  <Image
-                    src={product.image_url ?? "/images/products/cake1.jpg"}
+                  <ProductImage
+                    src={product.image_url}
                     alt={product.name}
                     fill
                     sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 25vw"

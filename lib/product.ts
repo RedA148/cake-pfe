@@ -1,4 +1,4 @@
-export interface Product {
+export type Product = {
   id: number;
   category_id: number | null;
   name: string;
@@ -8,9 +8,15 @@ export interface Product {
   is_available: boolean;
   created_at: string;
   categories?: {
+    id?: number;
     name: string;
   } | null;
-}
+};
+
+export type ProductCategory = {
+  id: number;
+  name: string;
+};
 
 export function formatProductPrice(price: number | string) {
   return `À partir de ${price} DH`;
