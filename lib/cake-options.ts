@@ -74,7 +74,7 @@ export function getColorPreview(name: string): string {
   return knownColors[normalizeOptionName(name)] ?? "#D4AF37";
 }
 
-export type CakeShapeCode = "round" | "square" | "heart" | "star" | "rectangle" | "unknown";
+export type CakeShapeCode = "round" | "square" | "heart" | "star" | "rectangle" | "pentagon" | "rhombus" | "unknown";
 
 export function getShapeCode(name: string): CakeShapeCode {
   const normalized = normalizeOptionName(name);
@@ -83,5 +83,7 @@ export function getShapeCode(name: string): CakeShapeCode {
   if (["heart", "coeur", "coer", "couer"].includes(normalized)) return "heart";
   if (["star", "etoile"].includes(normalized)) return "star";
   if (["rectangle", "rectangulaire"].includes(normalized)) return "rectangle";
+  if (["pentagon", "pentagone"].includes(normalized)) return "pentagon";
+  if (["rhombus", "diamond", "losange"].includes(normalized)) return "rhombus";
   return "unknown";
 }

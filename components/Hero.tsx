@@ -2,40 +2,46 @@
 
 import Image from "next/image";
 import Link from "next/link";
-import { useState } from "react";
 import { Autoplay, Pagination } from "swiper/modules";
 import { Swiper, SwiperSlide } from "swiper/react";
-import type { Swiper as SwiperType } from "swiper";
 import "swiper/css";
 import "swiper/css/pagination";
-import { buildCatalogueCategoryUrl, CAKE_CATEGORIES, type CategorySlug } from "@/lib/categories";
+import { buildCatalogueCategoryUrl } from "@/lib/categories";
 
-const heroImages: Record<(typeof CAKE_CATEGORIES)[number]["slug"], string> = {
-  anniversaire: "/images/hero/hero1.jpg",
-  mariage: "/images/hero/hero2.jpg",
-  "baby-shower": "/images/hero/hero3.jpg",
-  graduation: "/images/hero/hero1.jpg",
-  "saint-valentin": "/images/hero/hero2.jpg",
-};
-
-const subtitle =
-  "Créez un gâteau unique pour chaque occasion. Choisissez votre modèle, personnalisez chaque détail et commandez facilement en ligne.";
-
-const slides = CAKE_CATEGORIES.map((category) => ({
-  src: heroImages[category.slug],
-  title: "Délices de Bakri",
-  subtitle,
-  category: category.slug,
-  label: category.label,
-}));
+const slides = [
+  {
+    src: "/images/hero/hero1.jpg",
+    eyebrow: "GÂTEAUX SUR MESURE • DESIGN RAFFINÉ",
+    title: "Délices de Bakri",
+    description: "Créez un gâteau unique pour chaque occasion. Choisissez votre modèle, personnalisez chaque détail et commandez facilement en ligne.",
+    primaryLabel: "Personnaliser maintenant",
+    primaryHref: "/catalogue",
+    secondaryLabel: "Découvrir",
+    secondaryHref: buildCatalogueCategoryUrl("anniversaire"),
+  },
+  {
+    src: "/images/hero/hero2.jpg",
+    eyebrow: "SAVEURS AUTHENTIQUES • CRÉATIONS UNIQUES",
+    title: "Délices de Bakri",
+    description: "Choisissez la saveur, la forme, la taille et les couleurs pour composer un gâteau entièrement adapté à vos envies.",
+    primaryLabel: "Créer mon gâteau",
+    primaryHref: "/catalogue",
+    secondaryLabel: "Voir le catalogue",
+    secondaryHref: "/catalogue",
+  },
+  {
+    src: "/images/hero/hero3.jpg",
+    eyebrow: "POUR CHAQUE MOMENT • UNE CRÉATION",
+    title: "Délices de Bakri",
+    description: "Anniversaire, mariage ou événement spécial : découvrez des créations raffinées préparées pour rendre chaque moment inoubliable.",
+    primaryLabel: "Commander maintenant",
+    primaryHref: "/catalogue",
+    secondaryLabel: "Nos créations",
+    secondaryHref: buildCatalogueCategoryUrl("mariage"),
+  },
+] as const;
 
 export default function Hero() {
-  const [activeCategory, setActiveCategory] = useState<CategorySlug>("anniversaire");
-
-  const handleSlideChange = (swiper: SwiperType) => {
-    setActiveCategory(slides[swiper.realIndex].category);
-  };
-
   return (
     <section className="bg-[#FAFAFA] pt-24 pb-20 sm:pt-28">
       <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
@@ -48,13 +54,11 @@ export default function Hero() {
           pagination={{ clickable: true }}
           preventClicks={false}
           preventClicksPropagation={false}
-          onSwiper={handleSlideChange}
-          onSlideChange={handleSlideChange}
           className="w-full [&_.swiper-pagination]:bottom-5 [&_.swiper-pagination-bullet]:h-2.5 [&_.swiper-pagination-bullet]:w-2.5 [&_.swiper-pagination-bullet]:bg-white/80 [&_.swiper-pagination-bullet-active]:bg-[#D4AF37]"
         >
-          {slides.map((slide) => (
+          {slides.map((slide, index) => (
             <SwiperSlide
-              key={slide.category}
+              key={slide.src}
               className="pointer-events-none [&.swiper-slide-active]:pointer-events-auto [&.swiper-slide-duplicate-active]:pointer-events-auto"
             >
               <div className="overflow-hidden rounded-[24px] border border-white/70 bg-white shadow-[0_25px_80px_-20px_rgba(0,0,0,0.30)]">
@@ -63,7 +67,7 @@ export default function Hero() {
                     src={slide.src}
                     alt={slide.title}
                     fill
-                    priority={slide.category === "anniversaire"}
+                    priority={index === 0}
                     sizes="100vw"
                     className="object-cover transition-transform duration-[7000ms] ease-out will-change-transform"
                   />
@@ -73,26 +77,32 @@ export default function Hero() {
                   <div className="absolute inset-0 flex items-center">
                     <div className="max-w-2xl px-6 py-10 text-white sm:px-10 lg:px-14 lg:py-16">
                       <p className="mb-4 text-sm font-semibold uppercase tracking-[0.35em] text-[#D4AF37]">
-                        Custom cakes • Luxury design
+                        {slide.eyebrow}
                       </p>
-                      <h1 className="text-4xl font-bold leading-tight sm:text-5xl lg:text-6xl">
-                        {slide.title}
-                      </h1>
+                      <h1 className="sr-only">{slide.title}</h1>
+                      <Image
+                        src="/images/brand-logo.png"
+                        alt="Délices de Bakri"
+                        width={1667}
+                        height={387}
+                        priority={index === 0}
+                        className="h-auto w-full max-w-[520px] drop-shadow-[0_4px_18px_rgba(0,0,0,0.45)]"
+                      />
                       <p className="mt-6 max-w-xl text-base leading-8 text-white/90 sm:text-lg">
-                        {slide.subtitle}
+                        {slide.description}
                       </p>
                       <div className="swiper-no-swiping relative z-10 mt-8 flex flex-wrap gap-4">
                         <Link
-                          href="/catalogue"
+                          href={slide.primaryHref}
                           className="rounded-full bg-[#D4AF37] px-7 py-3.5 text-sm font-semibold text-white shadow-lg transition duration-300 hover:-translate-y-0.5 hover:bg-[#c79c1f]"
                         >
-                          Personnaliser maintenant
+                          {slide.primaryLabel}
                         </Link>
                         <Link
-                          href={buildCatalogueCategoryUrl(activeCategory)}
+                          href={slide.secondaryHref}
                           className="rounded-full border border-white/80 bg-white/10 px-7 py-3.5 text-sm font-semibold text-white backdrop-blur-sm transition duration-300 hover:bg-white/20"
                         >
-                          Découvrir
+                          {slide.secondaryLabel}
                         </Link>
                       </div>
                     </div>

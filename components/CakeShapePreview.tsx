@@ -11,6 +11,8 @@ type CakeShapePreviewProps = {
 };
 
 const starClipPath = "polygon(50% 0%, 61% 35%, 98% 35%, 68% 57%, 79% 91%, 50% 70%, 21% 91%, 32% 57%, 2% 35%, 39% 35%)";
+const pentagonClipPath = "polygon(50% 0%, 100% 38%, 82% 100%, 18% 100%, 0% 38%)";
+const rhombusClipPath = "polygon(50% 0%, 100% 50%, 50% 100%, 0% 50%)";
 const heartMask = `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Cpath fill='black' d='M50 93C44 86 8 63 8 35C8 18 20 7 35 7C43 7 49 12 50 21C51 12 57 7 65 7C80 7 92 18 92 35C92 63 56 86 50 93Z'/%3E%3C/svg%3E")`;
 
 export default function CakeShapePreview({
@@ -25,12 +27,18 @@ export default function CakeShapePreview({
     ? "aspect-square max-w-[320px] rounded-full"
     : shape === "rectangle"
       ? "aspect-[4/3] max-w-[360px] rounded-[24px]"
-      : shape === "heart" || shape === "star"
+      : shape === "heart" || shape === "star" || shape === "pentagon" || shape === "rhombus"
         ? "aspect-square max-w-[300px]"
         : "aspect-square max-w-[320px] rounded-[24px]";
   const previewStyle: CSSProperties = {
     backgroundColor: color,
-    clipPath: shape === "star" ? starClipPath : undefined,
+    clipPath: shape === "star"
+      ? starClipPath
+      : shape === "pentagon"
+        ? pentagonClipPath
+        : shape === "rhombus"
+          ? rhombusClipPath
+          : undefined,
   };
 
   if (shape === "heart") {

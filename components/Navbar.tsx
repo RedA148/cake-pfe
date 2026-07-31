@@ -1,4 +1,5 @@
 import Link from "next/link";
+import Image from "next/image";
 import { createClient } from "@/lib/server";
 import CustomerAccountMenu from "@/components/CustomerAccountMenu";
 
@@ -35,10 +36,15 @@ export default async function Navbar() {
   return (
     <header className="fixed left-0 top-0 z-50 w-full border-b border-gray-100 bg-white/95 shadow-sm backdrop-blur supports-[backdrop-filter]:bg-white/80">
       <div className="mx-auto flex max-w-7xl items-center justify-between px-6 py-4">
-        <Link href="/catalogue" className="flex items-center gap-3">
-          <span className="text-xl font-bold text-yellow-600 sm:text-2xl">
-            Délices de Bakri
-          </span>
+        <Link href="/" aria-label="Accueil" className="flex items-center gap-3">
+          <Image
+            src="/images/brand-logo.png"
+            alt="Délices de Bakri"
+            width={1667}
+            height={387}
+            priority
+            className="h-auto w-[112px] sm:w-[160px]"
+          />
         </Link>
 
         <nav className="hidden items-center gap-8 font-medium md:flex lg:gap-12">

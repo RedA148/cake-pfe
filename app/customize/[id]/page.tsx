@@ -1,6 +1,6 @@
 "use client";
 
-import { Circle, Heart, RectangleHorizontal, Ruler, Sparkles, Square, Star, Upload, BadgeCheck } from "lucide-react";
+import { BadgeCheck, Circle, Diamond, Heart, Pentagon, RectangleHorizontal, Ruler, Sparkles, Square, Star, Upload } from "lucide-react";
 import { ChangeEvent, useEffect, useRef, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { createClient } from "@/lib/client";
@@ -374,7 +374,11 @@ export default function CustomizePage() {
                           ? Star
                           : shapeCode === "rectangle"
                             ? RectangleHorizontal
-                            : Sparkles;
+                            : shapeCode === "pentagon"
+                              ? Pentagon
+                              : shapeCode === "rhombus"
+                                ? Diamond
+                                : Sparkles;
                   const isActive = option.id === selectedShapeId;
                   return (
                     <button

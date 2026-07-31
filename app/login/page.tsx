@@ -1,9 +1,10 @@
 "use client";
 
 import Link from "next/link";
+import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { FcGoogle } from "react-icons/fc";
-import { ArrowRight, Lock, Mail, Sparkles } from "lucide-react";
+import { ArrowRight, Lock, Mail } from "lucide-react";
 import { FormEvent, useRef, useState } from "react";
 import { createClient } from "@/utils/supabase/client";
 
@@ -125,8 +126,7 @@ export default function LoginPage() {
           <div className="grid gap-0 lg:grid-cols-[0.95fr_1.05fr]">
             <div className="bg-[linear-gradient(135deg,#FFF8E8_0%,#ffffff_100%)] p-8 sm:p-10 lg:p-12">
               <div className="inline-flex items-center gap-2 rounded-full border border-[#D4AF37]/30 bg-white px-4 py-2 text-sm font-semibold text-[#D4AF37] shadow-sm">
-                <Sparkles className="h-4 w-4" />
-                Délices de Bakri
+                <Image src="/images/brand-logo.png" alt="Délices de Bakri" width={1667} height={387} priority className="h-auto w-36" />
               </div>
 
               <h1 className="mt-8 text-4xl font-bold text-gray-900 sm:text-5xl">

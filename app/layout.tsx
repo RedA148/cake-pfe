@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "Délices de Bakri",
+  title: "LogoBakri",
   description: "Gâteaux personnalisés premium pour toutes les occasions",
 };
 

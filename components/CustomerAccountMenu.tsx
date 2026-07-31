@@ -80,12 +80,15 @@ export default function CustomerAccountMenu({ authenticated, displayName, compac
 
   return (
     <div className={`flex items-center ${compact ? "gap-2" : "gap-8 lg:gap-12"}`}>
-      {!compact ? (
-        <Link href="/orders" className="inline-flex items-center gap-2 text-gray-800 transition hover:text-yellow-600">
-          <Package className="h-4 w-4" aria-hidden="true" />
-          Mes commandes
-        </Link>
-      ) : null}
+      <Link
+        href="/orders"
+        aria-label={compact ? "Mes commandes" : undefined}
+        title={compact ? "Mes commandes" : undefined}
+        className={`inline-flex items-center text-gray-800 transition hover:text-yellow-600 ${compact ? "rounded-full p-2.5" : "gap-2"}`}
+      >
+        <Package className="h-4 w-4" aria-hidden="true" />
+        {!compact ? "Mes commandes" : null}
+      </Link>
 
       <div ref={wrapperRef} className="relative">
         <button
@@ -103,11 +106,8 @@ export default function CustomerAccountMenu({ authenticated, displayName, compac
 
         {open ? (
           <div role="menu" className="absolute right-0 top-full z-50 mt-2 w-56 overflow-hidden rounded-2xl border border-gray-200 bg-white p-2 text-sm shadow-xl">
-            <Link role="menuitem" href="/" onClick={() => setOpen(false)} className="flex items-center gap-3 rounded-xl px-3 py-2.5 text-gray-700 transition hover:bg-[#FFF8E8] hover:text-[#9a7613]">
+            <Link role="menuitem" href="/account" onClick={() => setOpen(false)} className="flex items-center gap-3 rounded-xl px-3 py-2.5 text-gray-700 transition hover:bg-[#FFF8E8] hover:text-[#9a7613]">
               <UserRound className="h-4 w-4" aria-hidden="true" /> Mon compte
-            </Link>
-            <Link role="menuitem" href="/orders" onClick={() => setOpen(false)} className="flex items-center gap-3 rounded-xl px-3 py-2.5 text-gray-700 transition hover:bg-[#FFF8E8] hover:text-[#9a7613]">
-              <Package className="h-4 w-4" aria-hidden="true" /> Mes commandes
             </Link>
             <button role="menuitem" type="button" disabled={pending} onClick={handleLogout} className="flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left text-red-600 transition hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-60">
               <LogOut className="h-4 w-4" aria-hidden="true" /> {pending ? "Déconnexion..." : "Déconnexion"}
