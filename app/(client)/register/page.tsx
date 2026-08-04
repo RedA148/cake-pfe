@@ -79,7 +79,8 @@ export default function RegisterPage() {
         return;
       }
 
-      router.push("/orders");
+      const requestedDestination = new URLSearchParams(window.location.search).get("next");
+      router.push(requestedDestination?.startsWith("/") ? requestedDestination : "/orders");
       router.refresh();
     } catch (error) {
       const message = error instanceof Error ? error.message : "Une erreur inattendue est survenue.";

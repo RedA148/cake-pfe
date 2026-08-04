@@ -15,7 +15,7 @@ export function isSupabaseStorageUrl(value: string): boolean {
 export function getProductImageSource(value: string | null | undefined): string {
   const source = value?.trim();
   if (!source) return PRODUCT_IMAGE_FALLBACK;
-  if (source.startsWith("/") || source.startsWith("blob:")) return source;
+  if (source.startsWith("/") || source.startsWith("blob:") || source.startsWith("data:image/")) return source;
 
   try {
     const url = new URL(source);

@@ -84,18 +84,36 @@ export type OrderItem = {
   quantity: number;
   price: number | string;
   snapshot?: OrderItemSnapshot | null;
+  products?: {
+    id: number;
+    name: string;
+    image_url: string | null;
+  } | {
+    id: number;
+    name: string;
+    image_url: string | null;
+  }[] | null;
+  cake_customizations?: CakeCustomization | CakeCustomization[] | null;
+};
+
+export type OrderProfile = {
+  id: string;
+  full_name: string | null;
+  email: string | null;
+  phone: string | null;
+  avatar_url?: string | null;
 };
 
 export type Order = {
   id: number;
-  profile_id: string;
-  address_id: number;
+  profile_id: string | null;
+  address_id: number | null;
   status: OrderStatus;
   payment_method: PaymentMethod;
   total_price: number | string;
   created_at: string;
   addresses?: Address | Address[] | null;
-  profiles?: { full_name: string | null; email: string | null; phone?: string | null } | { full_name: string | null; email: string | null; phone?: string | null }[] | null;
+  profiles?: OrderProfile | OrderProfile[] | null;
   order_items?: OrderItem[];
 };
 

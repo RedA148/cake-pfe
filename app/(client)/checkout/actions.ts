@@ -3,7 +3,8 @@
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { requireUser } from "@/lib/user-auth";
-import type { Address, PaymentMethod } from "@/lib/commerce";
+import { createClient } from "@/lib/server";
+import type { Address, GuestCartItem, PaymentMethod } from "@/lib/commerce";
 
 function logError(operation: string, error: { message: string; code?: string; details?: string; hint?: string }) {
   console.error(operation, { message: error.message, code: error.code, details: error.details, hint: error.hint });
@@ -36,4 +37,22 @@ export async function confirmOrder(addressId: number, paymentMethod: PaymentMeth
   const orderId = Number(data);
   revalidatePath("/cart"); revalidatePath("/orders"); revalidatePath("/admin/orders");
   redirect(`/orders/confirmation/${orderId}`);
+}
+
+export type GuestCheckoutDetails = { fullName: string; email: string; phone: string; address: string };
+
+export async function confirmGuestOrder(items: GuestCartItem[], details: GuestCheckoutDetails, paymentMethod: PaymentMethod) {
+  const guest = { fullName: details.fullName.trim(), email: details.email.trim().toLowerCase(), phone: details.phone.trim(), address: details.address.trim() };
+  if (!guest.fullName || !guest.phone || !guest.address || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(guest.email)) return { success: false, message: "Renseignez des informations de livraison valides." };
+  if (!Array.isArray(items) || items.length === 0 || items.length > 50) return { success: false, message: "Votre panier est vide ou invalide." };
+  if (!["cash_on_delivery", "card"].includes(paymentMethod)) return { success: false, message: "Mode de paiement invalide." };
+  const payload = items.map((item) => ({ product_id: item.productId, quantity: item.quantity, size_id: item.size_id, shape_id: item.shape_id, flavor_id: item.flavor_id, color_id: item.color_id, custom_text: item.customText, instructions: item.instructions, image_url: item.uploadedImage }));
+  const supabase = await createClient();
+  const { data, error } = await supabase.rpc("create_guest_order", { p_items: payload, p_full_name: guest.fullName, p_email: guest.email, p_phone: guest.phone, p_address: guest.address, p_payment_method: paymentMethod });
+  if (error) {
+    logError("Unable to create guest order", error);
+    const message = error.message.includes("PRODUCT_UNAVAILABLE") ? "Un produit de votre panier n’est plus disponible." : error.message.includes("INVALID_CART") ? "Votre panier est vide ou invalide." : "Impossible de créer la commande. Aucun paiement n’a été effectué.";
+    return { success: false, message };
+  }
+  return { success: true, message: "Commande créée.", orderId: Number(data) };
 }

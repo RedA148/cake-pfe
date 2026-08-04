@@ -106,7 +106,8 @@ export default function LoginPage() {
         return;
       }
 
-      const destination = profile?.role === "admin" ? "/admin" : "/orders";
+      const requestedDestination = new URLSearchParams(window.location.search).get("next");
+      const destination = profile?.role === "admin" ? "/admin" : requestedDestination?.startsWith("/") ? requestedDestination : "/orders";
       router.replace(destination);
       router.refresh();
     } catch (error) {
@@ -182,11 +183,17 @@ export default function LoginPage() {
                     </div>
                   </label>
 
-                  <div className="flex items-center justify-between text-sm">
+                  <div className="flex flex-wrap items-center justify-between gap-3 text-sm">
                     <label className="flex items-center gap-2 text-gray-600">
                       <input type="checkbox" className="h-4 w-4 rounded border-gray-300 text-[#D4AF37] focus:ring-[#D4AF37]" />
                       Se souvenir de moi
                     </label>
+                    <Link
+                      href="/forgot-password"
+                      className="font-semibold text-[#D4AF37] transition hover:text-[#b88f1f] hover:underline hover:underline-offset-4"
+                    >
+                      Mot de passe oublié ?
+                    </Link>
                   </div>
 
                   <button

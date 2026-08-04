@@ -1,11 +1,11 @@
 "use client";
 
 import Link from "next/link";
-import { Minus, Plus, Trash2 } from "lucide-react";
+import { Minus, Pencil, Plus, Trash2 } from "lucide-react";
 import { useEffect, useRef, useState, useTransition } from "react";
 import ProductImage from "@/components/ProductImage";
 import type { CartItem, GuestCartItem } from "@/lib/commerce";
-import { clearCart, loadCart, removeCartItem, updateCartItemQuantity } from "@/app/cart/actions";
+import { clearCart, loadCart, removeCartItem, updateCartItemQuantity } from "@/app/(client)/cart/actions";
 
 export default function CartPage() {
   const [items, setItems] = useState<CartItem[]>([]);
@@ -111,7 +111,19 @@ export default function CartPage() {
                     <div className="flex-1">
                       <div className="flex justify-between gap-4">
                         <div><h2 className="text-xl font-semibold">{item.productName}</h2>{!item.isAvailable ? <p className="mt-1 text-sm text-red-600">Produit indisponible</p> : null}</div>
-                        <button type="button" onClick={() => remove(item)} disabled={pending} className="h-fit rounded-full border border-red-100 p-2.5 text-red-600" aria-label="Supprimer"><Trash2 className="h-4 w-4" /></button>
+                        <div className="flex shrink-0 items-center gap-2">
+                          <Link
+                            href={authenticated && item.id
+                              ? `/customize/${item.productId}?editItemId=${item.id}`
+                              : `/customize/${item.productId}?editIndex=${index}`}
+                            className="inline-flex h-10 items-center gap-2 rounded-full border border-[#D4AF37]/40 px-3 text-sm font-semibold text-[#9a7613] transition hover:border-[#D4AF37] hover:bg-[#FFF8E8]"
+                            aria-label={`Modifier ${item.productName}`}
+                          >
+                            <Pencil className="h-4 w-4" aria-hidden="true" />
+                            <span className="hidden sm:inline">Modifier</span>
+                          </Link>
+                          <button type="button" onClick={() => remove(item)} disabled={pending} className="h-10 rounded-full border border-red-100 p-2.5 text-red-600 transition hover:border-red-200 hover:bg-red-50 disabled:opacity-50" aria-label="Supprimer"><Trash2 className="h-4 w-4" /></button>
+                        </div>
                       </div>
                       <div className="mt-4 grid grid-cols-2 gap-2 text-sm text-gray-600">
                         <span>Forme : <b>{item.shape}</b></span><span>Taille : <b>{item.size}</b></span>

@@ -1,7 +1,7 @@
 "use client";
 
 import { useActionState, useState } from "react";
-import { updateAccountProfile, type ProfileActionState } from "@/app/account/actions";
+import { updateAccountProfile, type ProfileActionState } from "@/app/(client)/account/actions";
 
 const initialProfileActionState: ProfileActionState = {
   success: false,

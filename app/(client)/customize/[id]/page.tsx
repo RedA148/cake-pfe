@@ -1,11 +1,14 @@
 "use client";
 
-import { BadgeCheck, Circle, Diamond, Heart, Pentagon, RectangleHorizontal, Ruler, Sparkles, Square, Star, Upload } from "lucide-react";
+import { BadgeCheck, Circle, Diamond, Heart, Pentagon, RectangleHorizontal, Ruler, Sparkles, Square, Star, Trash2, Upload } from "lucide-react";
 import { ChangeEvent, useEffect, useRef, useState } from "react";
-import { useParams, useRouter } from "next/navigation";
+import { useParams, useRouter, useSearchParams } from "next/navigation";
 import { createClient } from "@/lib/client";
 import type { Product } from "@/lib/product";
+import type { GuestCartItem } from "@/lib/commerce";
 import CakeShapePreview from "@/components/CakeShapePreview";
+import ProductImage from "@/components/ProductImage";
+import { loadCart, updateCartItemCustomization } from "@/app/(client)/cart/actions";
 import {
   getShapeCode,
   type CakeColor,
@@ -38,6 +41,7 @@ type CartItem = {
 export default function CustomizePage() {
   const params = useParams<{ id?: string | string[] }>();
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [sizes, setSizes] = useState<CakeSize[]>([]);
   const [shapes, setShapes] = useState<CakeShape[]>([]);
   const [flavors, setFlavors] = useState<CakeFlavor[]>([]);
@@ -52,6 +56,7 @@ export default function CustomizePage() {
   const [showToast, setShowToast] = useState(false);
   const [isAdding, setIsAdding] = useState(false);
   const addInProgressRef = useRef(false);
+  const imageInputRef = useRef<HTMLInputElement>(null);
   const [product, setProduct] = useState<Product | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -60,11 +65,19 @@ export default function CustomizePage() {
   const routeId = params?.id;
   const productId = typeof routeId === "string" && routeId.trim() !== "" ? Number(routeId) : Number.NaN;
   const hasValidProductId = Number.isInteger(productId) && productId > 0;
+  const editItemIdParam = searchParams.get("editItemId");
+  const requestedEditItemId = editItemIdParam === null ? Number.NaN : Number(editItemIdParam);
+  const editItemId = Number.isInteger(requestedEditItemId) && requestedEditItemId > 0 ? requestedEditItemId : null;
+  const editIndexParam = searchParams.get("editIndex");
+  const requestedEditIndex = editIndexParam === null ? Number.NaN : Number(editIndexParam);
+  const editIndex = Number.isInteger(requestedEditIndex) && requestedEditIndex >= 0 ? requestedEditIndex : null;
+  const isEditing = editItemId !== null || editIndex !== null;
 
   useEffect(() => {
     let isCurrentRequest = true;
 
     async function loadProduct() {
+      console.info("[CustomizePage] Dynamic route", { params, id: routeId, productId });
       if (!hasValidProductId) {
         setProduct(null);
         setNotFound(true);
@@ -76,9 +89,14 @@ export default function CustomizePage() {
       setError(null);
       setNotFound(false);
       setProduct(null);
+      setImagePreview(null);
+      if (imageInputRef.current) imageInputRef.current.value = "";
+      setText("");
+      setInstructions("");
 
       const supabase = createClient();
-      const [productResult, sizesResult, shapesResult, flavorsResult, colorsResult] = await Promise.all([
+      const [{ data: authData, error: authError }, productResult, sizesResult, shapesResult, flavorsResult, colorsResult] = await Promise.all([
+        supabase.auth.getUser(),
         supabase.from("products").select(`
           id,
           category_id,
@@ -99,6 +117,26 @@ export default function CustomizePage() {
       ]);
 
       if (!isCurrentRequest) return;
+
+      console.info("[CustomizePage] Authenticated user", {
+        userId: authData.user?.id ?? null,
+        email: authData.user?.email ?? null,
+      });
+      if (authError) {
+        console.error("[CustomizePage] Unable to read authenticated user", {
+          message: authError.message,
+          code: authError.code,
+          details: null,
+          hint: null,
+        });
+      }
+      console.info("[CustomizePage] Supabase result", {
+        product: productResult.data,
+        sizes: sizesResult.data,
+        shapes: shapesResult.data,
+        flavors: flavorsResult.data,
+        colors: colorsResult.data,
+      });
 
       const failedResult = [productResult, sizesResult, shapesResult, flavorsResult, colorsResult]
         .find((result) => result.error);
@@ -132,14 +170,37 @@ export default function CustomizePage() {
       const nextShapes = shapesResult.data as CakeShape[];
       const nextFlavors = flavorsResult.data as CakeFlavor[];
       const nextColors = colorsResult.data as CakeColor[];
+      let itemBeingEdited: GuestCartItem | null = null;
+
+      if (editItemId !== null) {
+        const cartResult = await loadCart([]);
+        itemBeingEdited = cartResult.items.find((item) => item.id === editItemId) ?? null;
+      } else if (editIndex !== null && typeof window !== "undefined") {
+        try {
+          const storedCart = window.localStorage.getItem("cart");
+          const parsedCart: unknown = storedCart ? JSON.parse(storedCart) : [];
+          if (Array.isArray(parsedCart)) {
+            itemBeingEdited = (parsedCart[editIndex] as GuestCartItem | undefined) ?? null;
+          }
+        } catch {
+          itemBeingEdited = null;
+        }
+      }
+
+      if (itemBeingEdited?.productId !== productId) itemBeingEdited = null;
+      if (!isCurrentRequest) return;
+
       setSizes(nextSizes);
       setShapes(nextShapes);
       setFlavors(nextFlavors);
       setColors(nextColors);
-      setSelectedSizeId(nextSizes[0]?.id ?? null);
-      setSelectedShapeId(nextShapes[0]?.id ?? null);
-      setSelectedFlavorId(nextFlavors[0]?.id ?? null);
-      setSelectedColorId(nextColors[0]?.id ?? null);
+      setSelectedSizeId(itemBeingEdited?.size_id ?? nextSizes[0]?.id ?? null);
+      setSelectedShapeId(itemBeingEdited?.shape_id ?? nextShapes[0]?.id ?? null);
+      setSelectedFlavorId(itemBeingEdited?.flavor_id ?? nextFlavors[0]?.id ?? null);
+      setSelectedColorId(itemBeingEdited?.color_id ?? nextColors[0]?.id ?? null);
+      setText(itemBeingEdited?.customText ?? "");
+      setInstructions(itemBeingEdited?.instructions ?? "");
+      setImagePreview(itemBeingEdited?.uploadedImage ?? null);
       setLoading(false);
     }
 
@@ -148,7 +209,7 @@ export default function CustomizePage() {
     return () => {
       isCurrentRequest = false;
     };
-  }, [hasValidProductId, productId]);
+  }, [editIndex, editItemId, hasValidProductId, productId]);
 
   const basePrice = product ? Number(product.base_price) || 0 : 0;
   const selectedSize = sizes.find((option) => option.id === selectedSizeId) ?? null;
@@ -170,7 +231,12 @@ export default function CustomizePage() {
     reader.readAsDataURL(file);
   };
 
-  const handleAddToCart = () => {
+  const handleRemoveImage = () => {
+    setImagePreview(null);
+    if (imageInputRef.current) imageInputRef.current.value = "";
+  };
+
+  const handleAddToCart = async () => {
     if (!product || !product.is_available || !hasCompleteOptions || isAdding || addInProgressRef.current) {
       return;
     }
@@ -205,6 +271,20 @@ export default function CustomizePage() {
         unitPrice: totalPrice,
       };
 
+      if (editItemId !== null) {
+        const result = await updateCartItemCustomization(editItemId, cartItem);
+        if (!result.success) {
+          window.alert(result.message);
+          addInProgressRef.current = false;
+          setIsAdding(false);
+          return;
+        }
+
+        setShowToast(true);
+        window.setTimeout(() => router.push("/cart"), 600);
+        return;
+      }
+
       const storedCart = window.localStorage.getItem("cart");
       let cart: CartItem[] = [];
 
@@ -218,6 +298,19 @@ export default function CustomizePage() {
           console.error("Unable to parse guest cart", {
             message: error instanceof Error ? error.message : "Invalid localStorage cart",
           });
+        }
+      }
+
+      if (editIndex !== null) {
+        const existingItem = cart[editIndex];
+        if (existingItem?.productId === cartItem.productId) {
+          cartItem.quantity = existingItem.quantity;
+          cartItem.totalPrice = existingItem.quantity * cartItem.unitPrice;
+          cart[editIndex] = cartItem;
+          window.localStorage.setItem("cart", JSON.stringify(cart));
+          setShowToast(true);
+          window.setTimeout(() => router.push("/cart"), 600);
+          return;
         }
       }
 
@@ -295,6 +388,17 @@ export default function CustomizePage() {
     );
   }
 
+  const selectionDetails: Array<{ label: string; value: string; highlight?: boolean }> = [
+    { label: "Modèle", value: product.name },
+    ...(selectedSize ? [{ label: "Poids", value: selectedSize.name }] : []),
+    ...(selectedShape ? [{ label: "Forme", value: selectedShape.name }] : []),
+    ...(selectedFlavor ? [{ label: "Saveur", value: selectedFlavor.name }] : []),
+    ...(selectedColor ? [{ label: "Couleur", value: selectedColor.name }] : []),
+    ...(text.trim() ? [{ label: "Message personnalisé", value: text.trim() }] : []),
+    ...(instructions.trim() ? [{ label: "Instructions spéciales", value: instructions.trim() }] : []),
+    { label: "Prix total", value: `${totalPrice} DH`, highlight: true },
+  ];
+
   return (
     <main className="min-h-screen bg-[#FAFAFA] pt-24 text-gray-900">
       <section className="mx-auto max-w-7xl px-6 py-16 sm:px-8 lg:px-10">
@@ -330,8 +434,8 @@ export default function CustomizePage() {
                 <CakeShapePreview
                   shapeName={selectedShape?.name}
                   color={selectedColor?.hex_color ?? "#D4AF37"}
-                  imageUrl={imagePreview}
-                  imageAlt="Aperçu de l’image personnalisée sur le gâteau"
+                  imageUrl={product.image_url}
+                  imageAlt={`Aperçu du gâteau ${product.name}`}
                 >
                   <div className="text-center text-sm font-medium text-gray-700">
                     <Sparkles className="mx-auto mb-2 h-8 w-8 text-[#D4AF37]" />
@@ -340,16 +444,23 @@ export default function CustomizePage() {
                 </CakeShapePreview>
               </div>
 
-              <div className="mt-6 rounded-[24px] border border-gray-200 bg-white p-4 text-center shadow-sm">
-                <p className="text-sm font-semibold uppercase tracking-[0.3em] text-[#D4AF37]">
+              <div className="mt-6 rounded-[24px] border border-[#D4AF37]/20 bg-white p-5 shadow-sm sm:p-6">
+                <p className="text-center text-sm font-semibold uppercase tracking-[0.3em] text-[#D4AF37]">
                   Sélection actuelle
                 </p>
-                <p className="mt-2 text-lg font-semibold text-gray-900">
-                  {selectedFlavor?.name ?? "Aucune saveur"} • {selectedShape?.name ?? "Aucune forme"}
-                </p>
-                {text ? (
-                  <p className="mt-2 text-sm text-gray-600">Texte: “{text}”</p>
-                ) : null}
+                <dl className="mt-4 grid grid-cols-1 gap-x-8 sm:grid-cols-2">
+                  {selectionDetails.map((detail) => (
+                    <div
+                      key={detail.label}
+                      className="flex items-start justify-between gap-4 border-b border-gray-100 py-3 last:border-b-0"
+                    >
+                      <dt className="text-sm text-gray-500">{detail.label}</dt>
+                      <dd className={`text-right text-sm font-semibold ${detail.highlight ? "text-[#B98A0B]" : "text-gray-900"}`}>
+                        {detail.value}
+                      </dd>
+                    </div>
+                  ))}
+                </dl>
               </div>
             </div>
           </div>
@@ -505,12 +616,56 @@ export default function CustomizePage() {
                 <h2 className="text-xl font-semibold text-gray-900">6. Ajouter une image</h2>
                 <p className="mt-1 text-sm text-gray-500">Téléchargez une photo pour votre design</p>
               </div>
-              <label className="flex cursor-pointer flex-col items-center justify-center rounded-[24px] border border-dashed border-[#D4AF37] bg-[#FFF8E8] px-6 py-10 text-center transition hover:bg-[#fff3d8]">
-                <Upload className="h-8 w-8 text-[#D4AF37]" />
-                <span className="mt-3 text-sm font-semibold text-[#D4AF37]">Cliquer pour télécharger</span>
-                <span className="mt-1 text-sm text-gray-600">PNG, JPG, WEBP</span>
-                <input type="file" accept="image/*" className="hidden" onChange={handleImageUpload} aria-label="Télécharger une image pour le gâteau" />
-              </label>
+              <input
+                ref={imageInputRef}
+                id="cake-image-upload"
+                type="file"
+                accept="image/*"
+                className="hidden"
+                onClick={(event) => { event.currentTarget.value = ""; }}
+                onChange={handleImageUpload}
+                aria-label="Télécharger une image pour le gâteau"
+              />
+
+              {imagePreview ? (
+                <div className="overflow-hidden rounded-[24px] border border-[#D4AF37]/25 bg-[#FFF8E8] p-3">
+                  <div className="relative h-56 overflow-hidden rounded-[18px] bg-white sm:h-64">
+                    <ProductImage
+                      src={imagePreview}
+                      alt="Aperçu de l’image sélectionnée"
+                      fill
+                      sizes="(max-width: 640px) 100vw, 480px"
+                      className="object-cover"
+                      unoptimized={imagePreview.startsWith("data:") || imagePreview.startsWith("blob:")}
+                    />
+                    <button
+                      type="button"
+                      onClick={handleRemoveImage}
+                      className="absolute right-3 top-3 z-10 inline-flex items-center gap-2 rounded-full border border-red-200 bg-white/95 px-3 py-2 text-xs font-semibold text-red-600 shadow-md backdrop-blur transition hover:border-red-300 hover:bg-red-50"
+                      aria-label="Supprimer l’image"
+                    >
+                      <Trash2 className="h-4 w-4" aria-hidden="true" />
+                      Supprimer l’image
+                    </button>
+                  </div>
+                  <label
+                    htmlFor="cake-image-upload"
+                    className="mt-3 flex cursor-pointer items-center justify-center gap-2 rounded-full border border-[#D4AF37]/40 bg-white px-4 py-3 text-sm font-semibold text-[#9a7613] transition hover:border-[#D4AF37] hover:bg-[#fffaf0]"
+                  >
+                    <Upload className="h-4 w-4" aria-hidden="true" />
+                    Changer l’image
+                  </label>
+                </div>
+              ) : (
+                <label
+                  htmlFor="cake-image-upload"
+                  className="flex cursor-pointer flex-col items-center justify-center rounded-[24px] border border-dashed border-[#D4AF37] bg-[#FFF8E8] px-6 py-10 text-center transition hover:bg-[#fff3d8]"
+                >
+                  <Upload className="h-8 w-8 text-[#D4AF37]" />
+                  <span className="mt-3 text-sm font-semibold text-[#D4AF37]">Cliquer pour télécharger</span>
+                  <span className="mt-1 text-sm text-gray-600">PNG, JPG, WEBP</span>
+                </label>
+              )}
             </div>
 
             <div className="rounded-[28px] border border-gray-200 bg-white p-6 shadow-[0_20px_60px_-20px_rgba(0,0,0,0.18)] sm:p-7">
@@ -565,7 +720,9 @@ export default function CustomizePage() {
                 aria-label="Ajouter cette création au panier"
                 className="mt-6 w-full rounded-full bg-[#D4AF37] px-4 py-3 text-sm font-semibold text-white transition duration-300 hover:bg-[#c79c1f] disabled:opacity-55"
               >
-                {isAdding ? "Ajout en cours..." : "Ajouter au panier"}
+                {isAdding
+                  ? (isEditing ? "Enregistrement..." : "Ajout en cours...")
+                  : (isEditing ? "Enregistrer les modifications" : "Ajouter au panier")}
               </button>
               {!product.is_available ? (
                 <p className="mt-3 text-center text-sm font-medium text-gray-600">
@@ -587,7 +744,9 @@ export default function CustomizePage() {
           <div className="flex h-8 w-8 items-center justify-center rounded-full bg-[#D4AF37]/20 text-[#D4AF37]">
             <BadgeCheck className="h-5 w-5" />
           </div>
-          <span className="text-sm font-semibold">Produit ajouté au panier</span>
+          <span className="text-sm font-semibold">
+            {isEditing ? "Produit modifié" : "Produit ajouté au panier"}
+          </span>
         </div>
       )}
     </main>

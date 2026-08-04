@@ -1,6 +1,6 @@
-import Image from "next/image";
 import type { CSSProperties, ReactNode } from "react";
 import { getShapeCode } from "@/lib/cake-options";
+import ProductImage from "@/components/ProductImage";
 
 type CakeShapePreviewProps = {
   shapeName: string | null | undefined;
@@ -22,6 +22,25 @@ export default function CakeShapePreview({
   imageAlt = "Aperçu du gâteau personnalisé",
   children,
 }: CakeShapePreviewProps) {
+  if (imageUrl) {
+    return (
+      <div
+        className="relative aspect-[4/3] w-full max-w-[420px] overflow-hidden rounded-[28px] border border-[#D4AF37]/20 bg-white shadow-[0_20px_50px_-20px_rgba(0,0,0,0.25)]"
+        aria-label={imageAlt}
+      >
+        <ProductImage
+          src={imageUrl}
+          alt={imageAlt}
+          fill
+          sizes="(max-width: 640px) 100vw, 420px"
+          className="object-cover"
+          unoptimized={imageUrl.startsWith("data:") || imageUrl.startsWith("blob:")}
+        />
+        <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-black/5 via-transparent to-white/10" />
+      </div>
+    );
+  }
+
   const shape = getShapeCode(shapeName ?? "");
   const shapeClass = shape === "round"
     ? "aspect-square max-w-[320px] rounded-full"
@@ -58,18 +77,7 @@ export default function CakeShapePreview({
       style={previewStyle}
       aria-label={shapeName ? `Aperçu en forme ${shapeName}` : "Aperçu du gâteau"}
     >
-      {imageUrl ? (
-        <Image
-          src={imageUrl}
-          alt={imageAlt}
-          fill
-          sizes="360px"
-          className="object-cover"
-          unoptimized={imageUrl.startsWith("data:") || imageUrl.startsWith("blob:")}
-        />
-      ) : (
-        <div className="relative z-20 flex items-center justify-center px-8 text-center">{children}</div>
-      )}
+      <div className="relative z-20 flex items-center justify-center px-8 text-center">{children}</div>
       <div className="pointer-events-none absolute inset-0 z-10 bg-gradient-to-br from-white/20 via-transparent to-black/10" />
     </div>
   );

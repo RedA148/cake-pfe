@@ -1,9 +1,8 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { LogOut, MapPin, Package } from "lucide-react";
-import Navbar from "@/components/Navbar";
-import ProfileForm from "@/app/account/ProfileForm";
-import { signOutAccount } from "@/app/account/actions";
+import ProfileForm from "@/app/(client)/account/ProfileForm";
+import { signOutAccount } from "@/app/(client)/account/actions";
 import { requireUser } from "@/lib/user-auth";
 import type { Address } from "@/lib/commerce";
 
@@ -49,7 +48,6 @@ export default async function AccountPage() {
 
   return (
     <>
-      <Navbar />
       <main className="min-h-screen bg-[#FAFAFA] pt-24 text-gray-900">
         <section className="mx-auto max-w-5xl px-6 py-16 sm:px-8">
           <header className="flex flex-col gap-6 rounded-[28px] border border-gray-200 bg-white p-6 shadow-sm sm:flex-row sm:items-center sm:p-8">

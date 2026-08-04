@@ -75,6 +75,17 @@ export async function loadCart(guestItems: GuestCartItem[]): Promise<CartResult>
     return await buildCartResult(supabase, user.id);
   } catch (error) {
     if (error && typeof error === "object" && "message" in error) logError("Unable to load or synchronize cart", error as { message: string });
+    if (!authenticated) {
+      const localItems = guestItems.filter((item) =>
+        Number.isInteger(item.productId) && Number.isInteger(item.quantity) && item.quantity > 0 &&
+        typeof item.productName === "string" && typeof item.productImage === "string" &&
+        typeof item.shape === "string" && typeof item.size === "string" &&
+        typeof item.flavor === "string" && typeof item.color === "string" &&
+        typeof (item as Partial<CartResult["items"][number]>).unitPrice === "number" &&
+        typeof (item as Partial<CartResult["items"][number]>).totalPrice === "number"
+      ) as CartResult["items"];
+      return { authenticated: false, items: localItems, total: calculateCartTotals(localItems), error: null };
+    }
     return { authenticated, items: [], total: 0, error: "Impossible de charger le panier." };
   }
 }
@@ -95,6 +106,49 @@ export async function updateCartItemQuantity(itemId: number, quantity: number) {
   const { error } = await context.supabase.from("cart_items").update({ quantity }).eq("id", itemId);
   if (error) { logError("Unable to update cart quantity", error); return { success: false, message: "Impossible de modifier la quantité." }; }
   return { success: true, message: "Quantité mise à jour." };
+}
+
+type CartCustomizationUpdate = Pick<GuestCartItem,
+  "size_id" | "shape_id" | "flavor_id" | "color_id" | "customText" | "instructions" | "uploadedImage"
+>;
+
+export async function updateCartItemCustomization(itemId: number, customization: CartCustomizationUpdate) {
+  if (!Number.isInteger(itemId) || itemId <= 0) {
+    return { success: false, message: "Article invalide." };
+  }
+
+  const context = await requireOwnedCartItem(itemId);
+  if (!context) return { success: false, message: "Article introuvable ou accès refusé." };
+
+  const optionIds = [
+    customization.size_id,
+    customization.shape_id,
+    customization.flavor_id,
+    customization.color_id,
+  ];
+  if (optionIds.some((id) => !Number.isInteger(id) || id <= 0)) {
+    return { success: false, message: "Options de personnalisation invalides." };
+  }
+
+  const { error } = await context.supabase
+    .from("cake_customizations")
+    .update({
+      size_id: customization.size_id,
+      shape_id: customization.shape_id,
+      flavor_id: customization.flavor_id,
+      color_id: customization.color_id,
+      custom_text: customization.customText.trim() || null,
+      instructions: customization.instructions.trim() || null,
+      image_url: customization.uploadedImage,
+    })
+    .eq("cart_item_id", itemId);
+
+  if (error) {
+    logError("Unable to update cart customization", error);
+    return { success: false, message: "Impossible de modifier l’article." };
+  }
+
+  return { success: true, message: "Article modifié." };
 }
 
 export async function removeCartItem(itemId: number) {
